@@ -16,12 +16,14 @@ import (
 	"log"
 
 	"github.com/gofrs/uuid"
+	"github.com/jquiterio/go-spb/hub"
 )
 
 type HubClient struct {
 	ID     string
 	Topics []string
 	Conn   *tls.Conn
+	Hub    *hub.Hub
 }
 
 type ClientMsg struct {
@@ -99,6 +101,15 @@ func NewHubClient(id string, topics []string) *HubClient {
 }
 
 func (c *HubClient) Disconnect() error {
+	return nil
+}
+
+func (c *HubClient) Publish(msg ClientMsg) error {
+	h := c.Hub
+	err := h.Publish(msg.Topic, msg.Data)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

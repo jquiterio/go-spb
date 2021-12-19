@@ -95,6 +95,7 @@ func NewHub() Hub {
 	return Hub{
 		Registry: redis,
 		Server:   NewHubServer(),
+		Clients:  make(map[string]HubClient),
 	}
 }
 

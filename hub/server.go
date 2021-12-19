@@ -8,11 +8,11 @@
 package hub
 
 import (
-	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -104,7 +104,7 @@ func (h *Hub) Serve() {
 			log.Println(err)
 			continue
 		}
-		go h.handleConn(conn)
+		go h.handleConn(conn.(*tls.Conn))
 	}
 }
 
@@ -115,28 +115,39 @@ func (h *Hub) handleConn(conn net.Conn) {
 
 		printConnState(conn.(*tls.Conn))
 
+		nconn := conn.(*tls.Conn)
+		buf := make([]byte, 1024)
+		n, err := nconn.Read(buf)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		fmt.Println("Received: " + string(buf[:n]))
+		received := buf[:n]
+
+		// sending back
+		nconn.Write([]byte("OK"))
+
 		var clientMsg ClientMsg
 
-		buf, err := bufio.NewReader(conn).ReadBytes('\n')
-		if err != nil {
-			log.Println(err)
-			return
-		}
 		// receive client message
-		err = json.Unmarshal(buf, &clientMsg)
+		err = json.Unmarshal(received, &clientMsg)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		fmt.Println(clientMsg)
 		client, ok := h.GetClient(clientMsg.ClientID)
 		if !ok {
 			if clientMsg.MsgType == "subscribe" {
+				log.Println("New client: " + clientMsg.ClientID)
 				cli := NewClient(clientMsg.ClientID, []string{clientMsg.Topic})
 				if ok := h.AddClient(cli); ok {
-					fmt.Println("Client " + clientMsg.ClientID + " subscribed to " + clientMsg.Topic)
+					log.Println("Client " + clientMsg.ClientID + " subscribed to " + clientMsg.Topic)
 				}
 			}
+			b, _ := json.Marshal(h.Clients)
+			fmt.Println("Sending back: " + string(b))
+			io.WriteString(nconn, string(b))
 		} else {
 			if clientMsg.MsgType == "subscribe" {
 				client.Topics = append(client.Topics, clientMsg.Topic)
@@ -167,6 +178,7 @@ func (h *Hub) handleConn(conn net.Conn) {
 		if err != nil {
 			log.Println(err)
 		}
+		nconn.Write([]byte(b))
 		fmt.Println(string(b))
 		fmt.Println("Client " + clientMsg.ClientID + " not found")
 	}
