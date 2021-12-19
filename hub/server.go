@@ -112,6 +112,7 @@ func (h *Hub) handleConn(conn net.Conn) {
 			log.Println(err)
 			return
 		}
+		fmt.Println(clientMsg)
 		client, ok := h.GetClient(clientMsg.ClientID)
 		if !ok {
 			if clientMsg.MsgType == "subscribe" {

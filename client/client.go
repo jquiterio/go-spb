@@ -9,8 +9,10 @@ package client
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/gofrs/uuid"
@@ -73,6 +75,15 @@ func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
 	// if err != nil {
 	// 	log.Fatalln(err)
 	// }
+	rootcert, err := ioutil.ReadFile("ca.pem")
+	if err != nil {
+		panic(err)
+	}
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM(rootcert)
+	if !ok {
+		panic("failed to parse root certificate")
+	}
 	config := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: true,
