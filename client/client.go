@@ -102,17 +102,17 @@ func (c *HubClient) Disconnect() error {
 	return nil
 }
 
-func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
+func (client *HubClient) NewTLSConnection(addr string, clientCert string, clientKey string, caCert string) {
 	// USER/PASS AUTH
 	if addr == "" {
 		addr = "localhost:8083"
 	}
 	// TLS CONN
-	// cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	rootcert, err := ioutil.ReadFile("certs/ca.pem")
+	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	rootcert, err := ioutil.ReadFile(caCert)
 	if err != nil {
 		panic(err)
 	}
