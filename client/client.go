@@ -63,16 +63,16 @@ func (c *HubClient) Disconnect() error {
 	return nil
 }
 
-func (client *HubClient) NewTLSConnection(addr string, clientCert string, clientKey string) {
+func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
 	// USER/PASS AUTH
 	if addr == "" {
 		addr = "localhost:8083"
 	}
 	// TLS CONN
-	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	// cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
 	config := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: false,
