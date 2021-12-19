@@ -102,17 +102,17 @@ func (c *HubClient) Disconnect() error {
 	return nil
 }
 
-func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
+func (client *HubClient) NewTLSConnection(addr string) {
 	// USER/PASS AUTH
 	if addr == "" {
 		addr = "localhost:8083"
 	}
 	// TLS CONN
-	// cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	rootcert, err := ioutil.ReadFile("ca.pem")
+	cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	rootcert, err := ioutil.ReadFile("certs/ca.pem")
 	if err != nil {
 		panic(err)
 	}
@@ -122,9 +122,8 @@ func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
 		panic("failed to parse root certificate")
 	}
 	config := &tls.Config{
-		Certificates:       []tls.Certificate{cert},
-		RootCAs:            roots,
-		InsecureSkipVerify: true,
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      roots,
 	}
 	tlsConn, err := tls.Dial("tcp", addr, config)
 	if err != nil {

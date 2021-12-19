@@ -56,11 +56,11 @@ func (h *Hub) Serve() {
 	hub_addr := os.Getenv("HUB_ADDR")
 	hub_port := os.Getenv("HUB_PORT")
 
-	cert, err := tls.LoadX509KeyPair("server.pem", "server.key")
+	cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
 	if err != nil {
 		panic("hub.Serve.X509KeyPair: " + err.Error())
 	}
-	rootcert, err := ioutil.ReadFile("ca.pem")
+	rootcert, err := ioutil.ReadFile("certs/ca.pem")
 	if err != nil {
 		panic(err)
 	}

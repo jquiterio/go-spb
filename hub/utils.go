@@ -73,6 +73,7 @@ func (h HubServer) GetServerCert() *pem.Block {
 }
 
 func (h HubServer) WriteClientCertsToFile(certType string) error {
+	basepath := "certs/"
 	certs := h.Certificate
 	var filename string
 	var cert []byte
@@ -92,7 +93,7 @@ func (h HubServer) WriteClientCertsToFile(certType string) error {
 	default:
 		return fmt.Errorf("Invalid certType: %s", certType)
 	}
-	certout, err := os.Create(filename + ".pem")
+	certout, err := os.Create(basepath + filename + ".pem")
 	if err != nil {
 		return err
 	}
@@ -102,7 +103,7 @@ func (h HubServer) WriteClientCertsToFile(certType string) error {
 		return err
 	}
 	if certType != "ca" {
-		keyout, err := os.OpenFile(filename+".key", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		keyout, err := os.OpenFile(basepath+filename+".key", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
 			return err
 		}
