@@ -32,6 +32,27 @@ type ClientMsg struct {
 	Data     interface{}
 }
 
+func (c *HubClient) Subscribe(msg ClientMsg) error {
+	b, err := msg.ToByte()
+	if err != nil {
+		return err
+	}
+	_, err = c.Conn.Write(b)
+	return err
+}
+
+func (c *HubClient) ReceiveMsg() {
+	for {
+		buf := make([]byte, 1024)
+		n, err := c.Conn.Read(buf)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		fmt.Println(string(buf[:n]))
+	}
+}
+
 // ToByte converts the message to a byte array
 func (msg *ClientMsg) ToByte() ([]byte, error) {
 	b, err := json.Marshal(msg)
@@ -39,6 +60,22 @@ func (msg *ClientMsg) ToByte() ([]byte, error) {
 		return []byte{}, err
 	}
 	return b, nil
+}
+func (msg *ClientMsg) FromByte(b []byte) error {
+	err := json.Unmarshal(b, msg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (client *HubClient) SendMsg(msg ClientMsg) error {
+	b, err := msg.ToByte()
+	if err != nil {
+		return err
+	}
+	_, err = client.Conn.Write(b)
+	return err
 }
 
 func (client HubClient) NewSubscription(topic string) ClientMsg {
@@ -86,6 +123,7 @@ func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
 	}
 	config := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
+		RootCAs:            roots,
 		InsecureSkipVerify: true,
 	}
 	tlsConn, err := tls.Dial("tcp", addr, config)
@@ -95,23 +133,24 @@ func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
 	client.Conn = tlsConn
 }
 
-func (c *HubClient) Subscribe(msg ClientMsg) error {
-	b, err := msg.ToByte()
-	if err != nil {
-		return err
-	}
-	_, err = c.Conn.Write(b)
-	return err
-}
+func (client HubClient) PrintConnectionStatus() {
+	log.Print(">>>>>>>>>>>>>>>> State <<<<<<<<<<<<<<<<")
+	conn := client.Conn
+	state := conn.ConnectionState()
+	log.Println("Remote Address: ", conn.RemoteAddr())
+	log.Printf("Version: %x", state.Version)
+	log.Printf("HandshakeComplete: %t", state.HandshakeComplete)
+	log.Printf("DidResume: %t", state.DidResume)
+	log.Printf("CipherSuite: %x", state.CipherSuite)
+	log.Printf("NegotiatedProtocol: %s", state.NegotiatedProtocol)
+	log.Printf("NegotiatedProtocolIsMutual: %t", state.NegotiatedProtocolIsMutual)
 
-func (c *HubClient) ReceiveMsg() {
-	for {
-		buf := make([]byte, 1024)
-		n, err := c.Conn.Read(buf)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		fmt.Println(string(buf[:n]))
+	log.Print("Certificate chain:")
+	for i, cert := range state.PeerCertificates {
+		subject := cert.Subject
+		issuer := cert.Issuer
+		log.Printf(" %d s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s", i, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
+		log.Printf("   i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
 	}
+	log.Print(">>>>>>>>>>>>>>>> State End <<<<<<<<<<<<<<<<")
 }

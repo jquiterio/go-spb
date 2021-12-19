@@ -10,8 +10,10 @@ package hub
 import (
 	"bufio"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -58,9 +60,21 @@ func (h *Hub) Serve() {
 	if err != nil {
 		panic("hub.Serve.X509KeyPair: " + err.Error())
 	}
+	rootcert, err := ioutil.ReadFile("ca.pem")
+	if err != nil {
+		panic(err)
+	}
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM(rootcert)
+	if !ok {
+		panic("failed to parse root certificate")
+	}
 
-	tlsconfig := &tls.Config{Certificates: []tls.Certificate{cert}}
-	tlsconfig.InsecureSkipVerify = false
+	tlsconfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    roots,
+	}
 
 	if hub_addr == "" {
 		ip = utils.GetIPAddr()
@@ -98,6 +112,8 @@ func (h *Hub) handleConn(conn net.Conn) {
 	defer conn.Close()
 	//r := bufio.NewReader(conn)
 	for {
+
+		printConnState(conn.(*tls.Conn))
 
 		var clientMsg ClientMsg
 
@@ -154,4 +170,24 @@ func (h *Hub) handleConn(conn net.Conn) {
 		fmt.Println(string(b))
 		fmt.Println("Client " + clientMsg.ClientID + " not found")
 	}
+}
+
+func printConnState(conn *tls.Conn) {
+	log.Print(">>>>>>>>>>>>>>>> State <<<<<<<<<<<<<<<<")
+	state := conn.ConnectionState()
+	log.Printf("Version: %x", state.Version)
+	log.Printf("HandshakeComplete: %t", state.HandshakeComplete)
+	log.Printf("DidResume: %t", state.DidResume)
+	log.Printf("CipherSuite: %x", state.CipherSuite)
+	log.Printf("NegotiatedProtocol: %s", state.NegotiatedProtocol)
+	log.Printf("NegotiatedProtocolIsMutual: %t", state.NegotiatedProtocolIsMutual)
+
+	log.Print("Certificate chain:")
+	for i, cert := range state.PeerCertificates {
+		subject := cert.Subject
+		issuer := cert.Issuer
+		log.Printf(" %d s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s", i, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
+		log.Printf("   i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
+	}
+	log.Print(">>>>>>>>>>>>>>>> State End <<<<<<<<<<<<<<<<")
 }
