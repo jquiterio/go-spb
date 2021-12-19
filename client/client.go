@@ -75,7 +75,7 @@ func (client *HubClient) NewTLSConnection(addr string, cert tls.Certificate) {
 	// }
 	config := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: false,
+		InsecureSkipVerify: true,
 	}
 	tlsConn, err := tls.Dial("tcp", addr, config)
 	if err != nil {
