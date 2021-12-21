@@ -71,7 +71,7 @@ func (h *Hub) Serve() {
 
 	e.POST("/", h.getMessages)
 	e.GET("/:topic", h.getMessages)
-	e.POST("subscribe/:topic", h.subscribeToTopic)
+	e.POST("subscribe", h.subscribeToTopic)
 	e.POST("/unsubscribe/:topic", h.unsubscribeTopic)
 	e.POST("/publish/:topic", h.publishToTopic)
 
