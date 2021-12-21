@@ -112,11 +112,10 @@ func (h *Hub) publishToTopic(c echo.Context) error {
 }
 
 func (h *Hub) subscribeToTopic(c echo.Context) error {
-
-	topic := c.Param("topic")
-	if topic == "" {
+	topics := []string{}
+	if err := c.Bind(&topics); err != nil {
 		return c.JSON(400, echo.Map{
-			"msg": "Topic is required",
+			"msg": err,
 		})
 	}
 	sub := h.getSubscriberFromRequest(c)
@@ -124,10 +123,13 @@ func (h *Hub) subscribeToTopic(c echo.Context) error {
 		id := c.Request().Header.Get(subscriberHeader)
 		h.Subscribe(Subscriber{
 			ID:     id,
-			Topics: []string{topic},
+			Topics: topics,
 		})
 	} else {
-		sub.Topics = append(sub.Topics, topic)
+		h.Subscribe(Subscriber{
+			ID:     sub.ID,
+			Topics: topics,
+		})
 	}
 	return c.JSON(200, echo.Map{
 		"msg": "OK",
