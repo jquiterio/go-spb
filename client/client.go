@@ -8,159 +8,174 @@
 package client
 
 import (
-	"crypto/tls"
-	"crypto/x509"
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"io"
+	"net/http"
+	"net/url"
 
 	"github.com/gofrs/uuid"
-	"github.com/jquiterio/go-spb/hub"
+	"github.com/golang/glog"
 )
 
-type HubClient struct {
-	ID     string
-	Topics []string
-	Conn   *tls.Conn
-	Hub    *hub.Hub
+type Client struct {
+	SubscriberID string
+	Topics       []string
+	HubAddr      string
+	conn         http.Client
+	req          http.Request
+	resp         http.Response
 }
 
-type ClientMsg struct {
-	ClientID string
-	MsgID    string
-	MsgType  string
-	Topic    string
-	Data     interface{}
-}
-
-func (c *HubClient) Subscribe(msg ClientMsg) error {
-	b, err := msg.ToByte()
+func NewHubClient(address string) (*Client, error) {
+	a, err := url.Parse("http://" + address)
 	if err != nil {
-		return err
+		glog.Fatal("Hub address must be a valid URL")
+		return nil, err
 	}
-	_, err = c.Conn.Write(b)
-	return err
+	return &Client{
+		HubAddr: a.String(),
+	}, nil
 }
 
-func (c *HubClient) ReceiveMsg() {
+func (c *Client) AddTopic(topic []string) (ok bool) {
+	if len(topic) == 0 {
+		glog.Error("no topics to add")
+		return
+	}
+	c.Topics = append(c.Topics, topic...)
+	return true
+}
+
+func (c *Client) Subscribe() (ok bool) {
+	url := fmt.Sprintf("%s/subscribe", c.HubAddr)
+	body := []byte(``)
+	if len(c.Topics) == 0 {
+		glog.Error("no topics to subscribe")
+		return false
+	} else if len(c.Topics) > 1 {
+		url = fmt.Sprintf("%s/subscribe", c.HubAddr)
+		body, _ = json.Marshal(c.Topics)
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		glog.Fatal(err)
+		return
+	}
+	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		glog.Fatal(err)
+		return
+	}
+	if resp.StatusCode != http.StatusCreated {
+		glog.Fatal("unexpected status code: ", resp.StatusCode)
+	}
+	return true
+}
+
+func (c *Client) Unsubscribe(topics []string) (ok bool) {
+	var url string
+	if len(topics) == 0 {
+		glog.Error("no topics to unsubscribe")
+		return
+	}
+	if len(topics) > 1 {
+		url = fmt.Sprintf("%s/unsubscribe", c.HubAddr)
+	} else {
+		url = fmt.Sprintf("%s/unsubscribe/%s", c.HubAddr, topics[0])
+	}
+	body, _ := json.Marshal(topics)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		glog.Fatal(err)
+	}
+	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		glog.Fatal("unexpected status code: ", resp.StatusCode)
+	}
+	return true
+}
+
+func (c *Client) Publish(topic string, msg interface{}) {
+	url := fmt.Sprintf("%s/publish", c.HubAddr)
+	body, err := json.Marshal(map[string]interface{}{
+		"topic":    topic,
+		"msg_type": "publish",
+		"msg":      msg,
+		"msg_id":   uuid.Must(uuid.NewV4()).String(),
+	})
+	if err != nil {
+		glog.Fatal(err)
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		glog.Fatal(err)
+	}
+	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		glog.Fatal("unexpected status code: ", resp.StatusCode)
+	}
+}
+
+func (c *Client) GetMessages() {
+	url := c.HubAddr
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	dec := json.NewDecoder(resp.Body)
 	for {
-		buf := make([]byte, 1024)
-		n, err := c.Conn.Read(buf)
+		var message interface{}
+		err := dec.Decode(&message)
 		if err != nil {
-			log.Println(err)
-			return
+			if err == io.EOF {
+				break
+			}
+			glog.Fatal(err)
 		}
-		fmt.Println(string(buf[:n]))
+		glog.Infof("Got Mesage: %+v", message)
 	}
 }
 
-// ToByte converts the message to a byte array
-func (msg *ClientMsg) ToByte() ([]byte, error) {
-	b, err := json.Marshal(msg)
+func (c *Client) GetTopicMessage(topic string) {
+	url := c.HubAddr + "/" + topic
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return []byte{}, err
+		glog.Fatal(err)
 	}
-	return b, nil
-}
-func (msg *ClientMsg) FromByte(b []byte) error {
-	err := json.Unmarshal(b, msg)
+	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		glog.Fatal(err)
 	}
-	return nil
-}
-
-func (client *HubClient) SendMsg(msg ClientMsg) error {
-	b, err := msg.ToByte()
-	if err != nil {
-		return err
+	dec := json.NewDecoder(resp.Body)
+	for {
+		var message interface{}
+		err := dec.Decode(&message)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			glog.Fatal(err)
+		}
+		glog.Infof("Got Mesage: %+v", message)
 	}
-	_, err = client.Conn.Write(b)
-	return err
-}
-
-func (client HubClient) NewSubscription(topic string) ClientMsg {
-	client.Topics = append(client.Topics, topic)
-	return ClientMsg{
-		ClientID: uuid.Must(uuid.NewV4()).String(),
-		MsgID:    uuid.Must(uuid.NewV4()).String(),
-		MsgType:  "subscribe",
-		Topic:    topic,
-	}
-}
-
-func NewHubClient(id string, topics []string) *HubClient {
-	if id == "" {
-		id = uuid.Must(uuid.NewV4()).String()
-	}
-	return &HubClient{
-		ID:     id,
-		Topics: topics,
-	}
-}
-
-func (c *HubClient) Disconnect() error {
-	return nil
-}
-
-func (c *HubClient) Publish(msg ClientMsg) error {
-	h := c.Hub
-	err := h.Publish(msg.Topic, msg.Data)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (client *HubClient) NewTLSConnection(addr string, clientCert string, clientKey string, caCert string) {
-	// USER/PASS AUTH
-	if addr == "" {
-		addr = "localhost:8083"
-	}
-	// TLS CONN
-	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	rootcert, err := ioutil.ReadFile(caCert)
-	if err != nil {
-		panic(err)
-	}
-	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(rootcert)
-	if !ok {
-		panic("failed to parse root certificate")
-	}
-	config := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      roots,
-	}
-	tlsConn, err := tls.Dial("tcp", addr, config)
-	if err != nil {
-		panic(err)
-	}
-	client.Conn = tlsConn
-}
-
-func (client HubClient) PrintConnectionStatus() {
-	log.Print(">>>>>>>>>>>>>>>> State <<<<<<<<<<<<<<<<")
-	conn := client.Conn
-	state := conn.ConnectionState()
-	log.Println("Remote Address: ", conn.RemoteAddr())
-	log.Printf("Version: %x", state.Version)
-	log.Printf("HandshakeComplete: %t", state.HandshakeComplete)
-	log.Printf("DidResume: %t", state.DidResume)
-	log.Printf("CipherSuite: %x", state.CipherSuite)
-	log.Printf("NegotiatedProtocol: %s", state.NegotiatedProtocol)
-	log.Printf("NegotiatedProtocolIsMutual: %t", state.NegotiatedProtocolIsMutual)
-
-	log.Print("Certificate chain:")
-	for i, cert := range state.PeerCertificates {
-		subject := cert.Subject
-		issuer := cert.Issuer
-		log.Printf(" %d s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s", i, subject.Country, subject.Province, subject.Locality, subject.Organization, subject.OrganizationalUnit, subject.CommonName)
-		log.Printf("   i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s", issuer.Country, issuer.Province, issuer.Locality, issuer.Organization, issuer.OrganizationalUnit, issuer.CommonName)
-	}
-	log.Print(">>>>>>>>>>>>>>>> State End <<<<<<<<<<<<<<<<")
 }

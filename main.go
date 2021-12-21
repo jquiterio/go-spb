@@ -7,16 +7,11 @@
 
 package main
 
-import (
-	"github.com/jquiterio/go-spb/hub"
-)
+import "github.com/jquiterio/go-spb/hub"
 
 func main() {
 
-	hub := hub.NewHub()
-	hub.Server.PrintClientCerts()
-	hub.Server.WriteClientCertsToFile("server")
-	hub.Server.WriteClientCertsToFile("client")
-	hub.Server.WriteClientCertsToFile("ca")
-	hub.Serve()
+	h := hub.NewHub()
+	h.Serve()
+
 }

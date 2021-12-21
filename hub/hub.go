@@ -1,5 +1,5 @@
 /*
- * @file: main.go
+ * @file: hub.go
  * @author: Jorge Quitério
  * @copyright (c) 2021 Jorge Quitério
  * @license: MIT
@@ -9,162 +9,153 @@ package hub
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"strconv"
+	"encoding/json"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/jquiterio/go-spb/utils"
+	"github.com/gofrs/uuid"
+	"github.com/jquiterio/go-spb/config"
 )
 
-type HubServer struct {
-	Addr        string
-	Port        string
-	Certificate utils.AuthCert
-}
+var ctx = context.Background()
 
 type Hub struct {
-	Registry     *redis.Client
-	Subscription *redis.PubSub
-	Server       *HubServer
-	Clients      map[string]HubClient
+	Subscribers []Subscriber
+	Topics      []string
+	Registry    *redis.Client
 }
 
-type HubClient struct {
+type Message struct {
+	SubscriberID string `json:"subscriber_id"`
+	MsgID        string `json:"msg_id"`
+	MsgType      string `json:"msg_type"`
+	Topic        string `json:"topic"`
+	Msg          interface {
+	} `json:"msg"`
+}
+
+type Subscriber struct {
 	ID     string
 	Topics []string
 }
 
-type ClientMsg struct {
-	ClientID string
-	MsgID    string
-	MsgType  string
-	Topic    string
-	Data     interface{}
-}
-
-func NewClient(id string, topics []string) HubClient {
-	return HubClient{
-		ID:     id,
-		Topics: topics,
+func (m *Message) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"subscriber_id": m.SubscriberID,
+		"msg_id":        m.MsgID,
+		"topic":         m.Topic,
+		"msg":           m.Msg,
 	}
 }
 
-func (h *Hub) GetClient(id string) (HubClient, bool) {
-	client := h.Clients[id]
-	if client.ID != "" {
-		return client, true
+func NewHub() *Hub {
+	conf := config.Config
+	return &Hub{
+		Subscribers: make([]Subscriber, 0),
+		Topics:      make([]string, 0),
+		Registry: redis.NewClient(&redis.Options{
+			Addr: conf.Redis.Addr,
+			DB:   conf.Redis.DB,
+		}),
 	}
-	return HubClient{}, false
 }
 
-func (h *Hub) AddClient(hc HubClient) bool {
-	if hc.ID != "" {
-		h.Clients[hc.ID] = hc
-		return true
+func (h *Hub) Subscribe(sub Subscriber) {
+	h.Subscribers = append(h.Subscribers, sub)
+	h.addTopicFromSubscribers()
+}
+
+func (h *Hub) removeTopicFromSubscribers() {
+	for _, sub := range h.Subscribers {
+		for i, t := range sub.Topics {
+			if !h.HasTopic(t) {
+				sub.Topics = append(sub.Topics[:i], sub.Topics[i+1:]...)
+			}
+		}
+	}
+}
+
+func (h *Hub) HasTopic(topic string) bool {
+	for _, t := range h.Topics {
+		if t == topic {
+			return true
+		}
 	}
 	return false
 }
 
-type Message *redis.Message
-
-var ctx = context.Background()
-
-func NewHub() Hub {
-
-	redis_addr := os.Getenv("REDIS_ADDR")
-	if redis_addr == "" {
-		fmt.Println("REDIS_ADDR not set. Using default: localhost:6379")
-		redis_addr = "localhost:6379"
+func (h *Hub) Unsubscribe(sub *Subscriber, topics []string) (ok bool) {
+	for _, topic := range topics {
+		sub.RemoveTopic(topic)
 	}
-	redis_pass := os.Getenv("REDIS_PASS")
-	if redis_pass == "" {
-		fmt.Println("REDIS_PASS not set. Not using password")
-		redis_pass = ""
-	}
-	redis_db, _ := strconv.ParseInt(os.Getenv("REDIS_DB"), 10, 32)
-	if redis_db == 0 {
-		fmt.Println("REDIS_DB not set or set to 0. Using default: 0")
-		redis_db = 0
-	}
-	redis := redis.NewClient(&redis.Options{
-		Addr:     redis_addr,
-		Password: redis_pass,
-		DB:       int(redis_db),
-	})
-	return Hub{
-		Registry: redis,
-		Server:   NewHubServer(),
-		Clients:  make(map[string]HubClient),
-	}
+	h.removeTopicFromSubscribers()
+	return true
 }
 
-func NewHubServer() *HubServer {
-	addr := os.Getenv("HUB_ADDR")
-	if addr == "" {
-		fmt.Println("HUB_ADDR not set. Using default: localhost")
-		addr = "localhost"
-	}
-	port := os.Getenv("HUB_PORT")
-	if port == "" {
-		fmt.Println("HUB_PORT not set. Using default: 8083")
-		port = "8083"
-	}
-	certs, err := utils.GenCert()
-	if err != nil {
-		panic(err)
-	}
-	return &HubServer{
-		Addr:        addr,
-		Port:        port,
-		Certificate: certs,
-	}
-}
-
-func (hub *Hub) Publish(topic string, msg interface{}) error {
-	reg := hub.Registry
-	if err := reg.Publish(ctx, topic, msg).Err(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (hub *Hub) Subscribe(topics ...string) {
-	reg := hub.Registry
-	hub.Subscription = reg.Subscribe(ctx, topics...)
-}
-
-func (hub *Hub) Unsubscribe(topics ...string) error {
-	sub := hub.Subscription
-	return sub.Unsubscribe(ctx, topics...)
-}
-
-func (hub *Hub) Close() error {
-	reg := hub.Registry
-	err := reg.Close()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (hub *Hub) GetMessage(topic string) (interface{}, error) {
-	sub := hub.Subscription
-	for {
-		return sub.ReceiveMessage(ctx)
-	}
-}
-
-func (hub *Hub) GetSubscribedMessages(topic string) *redis.Message {
-	sub := hub.Subscription
-	for {
-		msg, _ := sub.ReceiveMessage(ctx)
-		for _, c := range hub.Clients {
-			for _, t := range c.Topics {
-				if t == msg.Channel {
-					return msg
-				}
-			}
+func (h *Hub) GetSubscriber(id string) *Subscriber {
+	for _, sub := range h.Subscribers {
+		if sub.ID == id {
+			return &sub
 		}
 	}
+	return nil
+}
+
+func (h *Hub) addTopicFromSubscribers() {
+	for _, sub := range h.Subscribers {
+		h.Topics = append(h.Topics, sub.Topics...)
+	}
+}
+
+func (m *Message) FromMap(msg map[string]interface{}) error {
+	m.SubscriberID = msg["subscriber_id"].(string)
+	m.MsgID = msg["msg_id"].(string)
+	m.Msg = msg["msg"]
+	m.Topic = msg["topic"].(string)
+	return nil
+}
+
+func (m *Message) ToJson() ([]byte, error) {
+	return json.Marshal(m.ToMap())
+}
+
+func NewMessage(sub Subscriber, topic string, msg interface{}) *Message {
+	return &Message{
+		SubscriberID: sub.ID,
+		MsgID:        uuid.Must(uuid.NewV4()).String(),
+		Topic:        topic,
+		Msg:          msg,
+	}
+}
+
+func NewSubscriber(topics ...string) *Subscriber {
+	return &Subscriber{
+		ID:     uuid.Must(uuid.NewV4()).String(),
+		Topics: topics,
+	}
+}
+
+func (s Subscriber) HasTopic(topic string) bool {
+	for _, t := range s.Topics {
+		if t == topic {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Subscriber) AddTopic(topic string) {
+	s.Topics = append(s.Topics, topic)
+}
+
+func (s *Subscriber) RemoveTopic(topic string) {
+	for i, t := range s.Topics {
+		if t == topic {
+			s.Topics = append(s.Topics[:i], s.Topics[i+1:]...)
+			return
+		}
+	}
+}
+
+func (h *Hub) Publish(msg Message) error {
+	return h.Registry.Publish(ctx, msg.Topic, msg.Msg).Err()
 }
