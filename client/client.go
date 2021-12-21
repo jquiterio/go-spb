@@ -20,12 +20,12 @@ import (
 )
 
 type Client struct {
-	SubscriberID string
-	Topics       []string
-	HubAddr      string
-	conn         http.Client
-	req          http.Request
-	resp         http.Response
+	ClientID string
+	Topics   []string
+	HubAddr  string
+	conn     http.Client
+	req      http.Request
+	resp     http.Response
 }
 
 func NewHubClient(address string) (*Client, error) {
@@ -35,7 +35,8 @@ func NewHubClient(address string) (*Client, error) {
 		return nil, err
 	}
 	return &Client{
-		HubAddr: a.String(),
+		HubAddr:  a.String(),
+		ClientID: uuid.Must(uuid.NewV4()).String(),
 	}, nil
 }
 
@@ -63,7 +64,7 @@ func (c *Client) Subscribe() (ok bool) {
 		glog.Fatal(err)
 		return
 	}
-	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -92,7 +93,7 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -119,7 +120,7 @@ func (c *Client) Publish(topic string, msg interface{}) {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -136,7 +137,7 @@ func (c *Client) GetMessages() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		glog.Fatal(err)
@@ -161,7 +162,7 @@ func (c *Client) GetTopicMessage(topic string) {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	req.Header.Set("X-Subscriber-ID", c.SubscriberID)
+	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		glog.Fatal(err)
