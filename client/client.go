@@ -168,15 +168,17 @@ func (c *Client) GetTopicMessage(topic string) {
 		glog.Fatal(err)
 	}
 	dec := json.NewDecoder(resp.Body)
-	for {
-		var message interface{}
-		err := dec.Decode(&message)
-		if err != nil {
-			if err == io.EOF {
-				break
+	go func() {
+		for {
+			var message interface{}
+			err := dec.Decode(&message)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				glog.Fatal(err)
 			}
-			glog.Fatal(err)
+			glog.Infof("Got Mesage: %+v", message)
 		}
-		glog.Infof("Got Mesage: %+v", message)
-	}
+	}()
 }
