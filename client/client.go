@@ -106,7 +106,7 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 }
 
 func (c *Client) Publish(topic string, msg interface{}) {
-	url := fmt.Sprintf("%s/publish", c.HubAddr)
+	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 	body, err := json.Marshal(map[string]interface{}{
 		"topic":    topic,
 		"msg_type": "publish",
