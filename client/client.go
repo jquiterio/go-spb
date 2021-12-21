@@ -71,7 +71,7 @@ func (c *Client) Subscribe() (ok bool) {
 		glog.Fatal(err)
 		return
 	}
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		glog.Fatal("unexpected status code: ", resp.StatusCode)
 	}
 	return true
