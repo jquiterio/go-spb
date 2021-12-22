@@ -189,42 +189,6 @@ func (h *Hub) getMessages(c echo.Context) error {
 				}
 			}
 		}
-		return nil
 	}
-
-	// for {
-	// 	if topic == "" {
-	// 		for _, s := range h.Subscribers {
-	// 			if s.ID == sub.ID {
-	// 				for _, t := range s.Topics {
-	// 					stream := h.Registry.Subscribe(ctx, t)
-	// 					m, err := stream.ReceiveMessage(ctx)
-	// 					if err != nil {
-	// 						return err
-	// 					}
-	// 					if t == m.Channel {
-	// 						if err := enc.Encode(m.Payload); err != nil {
-	// 							return err
-	// 						}
-	// 						c.Response().Flush()
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	} else {
-	// 		stream := h.Registry.Subscribe(ctx, topic)
-	// 		m, err := stream.ReceiveMessage(ctx)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		if TopicInSubscriber(topic, sub) && m.Channel == topic {
-	// 			if err := enc.Encode(m.Payload); err != nil {
-	// 				return err
-	// 			}
-	// 			c.Response().Flush()
-	// 		}
-	// 	}
-	// 	time.Sleep(1 * time.Second)
-	// }
-
+	return nil
 }
