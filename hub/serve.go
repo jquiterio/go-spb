@@ -59,13 +59,13 @@ func (h *Hub) Serve() {
 	conf := config.Config
 
 	e := echo.New()
-	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-		XSSProtection:         "",
-		ContentTypeNosniff:    "",
-		XFrameOptions:         "",
-		HSTSMaxAge:            3600,
-		ContentSecurityPolicy: "default-src 'self'",
-	}))
+	// e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+	// 	XSSProtection:         "",
+	// 	ContentTypeNosniff:    "",
+	// 	XFrameOptions:         "",
+	// 	HSTSMaxAge:            3600,
+	// 	ContentSecurityPolicy: "default-src 'self'",
+	// }))
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
 
@@ -160,42 +160,43 @@ func (h *Hub) unsubscribeTopic(c echo.Context) error {
 func (h *Hub) getMessages(c echo.Context) error {
 
 	topic := c.Param("topic")
+	//sub_id := c.Request().Header.Get(subscriberHeader)
 	sub := h.getSubscriberFromRequest(c)
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
-	if topic == "" {
-		for _, t := range sub.Topics {
-			stream := h.Registry.Subscribe(ctx, t)
-			for {
-				m, err := stream.ReceiveMessage(ctx)
-				if err != nil {
-					return err
-				}
-				if t == m.Channel {
-					if err := enc.Encode(m.Payload); err != nil {
-						return err
+	for {
+		if topic == "" {
+			for _, s := range h.Subscribers {
+				if s.ID == sub.ID {
+					for _, t := range s.Topics {
+						stream := h.Registry.Subscribe(ctx, t)
+						m, err := stream.ReceiveMessage(ctx)
+						if err != nil {
+							continue
+						}
+						if t == m.Channel {
+							if err := enc.Encode(m.Payload); err != nil {
+								continue
+							}
+							c.Response().Flush()
+						}
 					}
-					c.Response().Flush()
 				}
-				time.Sleep(1 * time.Second)
 			}
-		}
-	} else {
-		stream := h.Registry.Subscribe(ctx, topic)
-		for {
+		} else {
+			stream := h.Registry.Subscribe(ctx, topic)
 			m, err := stream.ReceiveMessage(ctx)
 			if err != nil {
-				return err
+				continue
 			}
 			if TopicInSubscriber(topic, sub) && m.Channel == topic {
 				if err := enc.Encode(m.Payload); err != nil {
-					return err
+					continue
 				}
 				c.Response().Flush()
 			}
-			time.Sleep(1 * time.Second)
 		}
+		time.Sleep(1 * time.Second)
 	}
-	return nil
 }
