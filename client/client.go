@@ -138,9 +138,13 @@ func (c *Client) GetMessages() {
 		glog.Fatal(err)
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		glog.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		glog.Fatal("unexpected status code: ", resp.StatusCode)
 	}
 	fmt.Println("Resp Code: ", resp.StatusCode)
 	fmt.Println("Resp Body: ", resp.Body)
