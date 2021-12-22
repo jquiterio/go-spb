@@ -69,7 +69,7 @@ func (h *Hub) Serve() {
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
 
-	e.POST("/", h.getMessages)
+	e.GET("/", h.getMessages)
 	e.GET("/:topic", h.getMessages)
 	e.POST("subscribe", h.subscribeToTopic)
 	e.POST("/unsubscribe/:topic", h.unsubscribeTopic)
@@ -165,16 +165,16 @@ func (h *Hub) getMessages(c echo.Context) error {
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
 	if topic == "" {
-		for _, t := range h.Topics {
+		for _, t := range sub.Topics {
 			stream := h.Registry.Subscribe(ctx, t)
 			for {
 				m, err := stream.ReceiveMessage(ctx)
 				if err != nil {
-					break
+					return err
 				}
-				if t == m.Channel && TopicInSubscriber(t, sub) {
+				if t == m.Channel {
 					if err := enc.Encode(m.Payload); err != nil {
-						break
+						return err
 					}
 					c.Response().Flush()
 				}
@@ -186,11 +186,11 @@ func (h *Hub) getMessages(c echo.Context) error {
 		for {
 			m, err := stream.ReceiveMessage(ctx)
 			if err != nil {
-				break
+				return err
 			}
 			if TopicInSubscriber(topic, sub) && m.Channel == topic {
-				if err := enc.Encode(m); err != nil {
-					break
+				if err := enc.Encode(m.Payload); err != nil {
+					return err
 				}
 				c.Response().Flush()
 			}

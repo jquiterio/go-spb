@@ -133,7 +133,7 @@ func (c *Client) Publish(topic string, msg interface{}) {
 
 func (c *Client) GetMessages() {
 	url := c.HubAddr
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -142,6 +142,8 @@ func (c *Client) GetMessages() {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	fmt.Println("Resp Code: ", resp.StatusCode)
+	fmt.Println("Resp Body: ", resp.Body)
 	dec := json.NewDecoder(resp.Body)
 	for {
 		var message interface{}
@@ -157,7 +159,7 @@ func (c *Client) GetMessages() {
 }
 
 func (c *Client) GetTopicMessage(topic string) {
-	url := c.HubAddr + "/" + topic
+	url := fmt.Sprintf("%s/%s", c.HubAddr, topic)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		glog.Fatal(err)
@@ -167,6 +169,8 @@ func (c *Client) GetTopicMessage(topic string) {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	fmt.Println("Resp Code: ", resp.StatusCode)
+	fmt.Println("Resp Body: ", resp.Body)
 	dec := json.NewDecoder(resp.Body)
 	go func() {
 		for {
