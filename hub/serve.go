@@ -170,24 +170,36 @@ func (h *Hub) getMessages(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
+	// for {
+	// 	for _, s := range h.Subscribers {
+	// 		if s.ID == sub.ID {
+	// 			for _, t := range s.Topics {
+	// 				stream := h.Registry.Subscribe(ctx, t)
+	// 				m, err := stream.ReceiveMessage(ctx)
+	// 				if err != nil {
+	// 					return err
+	// 				}
+	// 				if t == m.Channel {
+	// 					if err := enc.Encode(m.Payload); err != nil {
+	// 						return err
+	// 					}
+	// 					c.Response().Flush()
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// 	time.Sleep(1 * time.Second)
+	// }
+	stream := h.Registry.Subscribe(c.Request().Context(), sub.Topics...)
 	for {
-		for _, s := range h.Subscribers {
-			if s.ID == sub.ID {
-				for _, t := range s.Topics {
-					stream := h.Registry.Subscribe(ctx, t)
-					m, err := stream.ReceiveMessage(ctx)
-					if err != nil {
-						return err
-					}
-					if t == m.Channel {
-						if err := enc.Encode(m.Payload); err != nil {
-							return err
-						}
-						c.Response().Flush()
-					}
-				}
-			}
+		m, err := stream.ReceiveMessage(c.Request().Context())
+		if err != nil {
+			return err
 		}
+		if err := enc.Encode(m.Payload); err != nil {
+			return err
+		}
+		c.Response().Flush()
 		time.Sleep(1 * time.Second)
 	}
 }
