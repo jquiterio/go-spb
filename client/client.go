@@ -137,6 +137,10 @@ func (c *Client) GetMessages() {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	fmt.Println("Topics:")
+	for _, t := range c.Topics {
+		fmt.Println(t)
+	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
