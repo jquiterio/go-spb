@@ -70,7 +70,7 @@ func (h *Hub) Serve() {
 	e.Use(HandlerSubscriberRequest())
 
 	e.GET("/", h.getMessages)
-	e.GET("/:topic", h.getMessages)
+	//e.GET("/:topic", h.getMessages)
 	e.POST("subscribe", h.subscribeToTopic)
 	e.POST("/unsubscribe/:topic", h.unsubscribeTopic)
 	e.POST("/publish/:topic", h.publishToTopic)

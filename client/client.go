@@ -172,17 +172,15 @@ func (c *Client) GetTopicMessage(topic string) {
 	fmt.Println("Resp Code: ", resp.StatusCode)
 	fmt.Println("Resp Body: ", resp.Body)
 	dec := json.NewDecoder(resp.Body)
-	go func() {
-		for {
-			var message interface{}
-			err := dec.Decode(&message)
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				glog.Fatal(err)
+	for {
+		var message interface{}
+		err := dec.Decode(&message)
+		if err != nil {
+			if err == io.EOF {
+				continue
 			}
-			glog.Infof("Got Mesage: %+v", message)
+			glog.Fatal(err)
 		}
-	}()
+		glog.Infof("Got Mesage: %+v", message)
+	}
 }
