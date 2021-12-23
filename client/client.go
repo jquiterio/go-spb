@@ -51,12 +51,11 @@ func (c *Client) AddTopic(topic []string) (ok bool) {
 
 func (c *Client) Subscribe() (ok bool) {
 	url := fmt.Sprintf("%s/subscribe", c.HubAddr)
-	body := []byte(``)
+	var body []byte
 	if len(c.Topics) == 0 {
 		glog.Error("no topics to subscribe")
 		return false
-	} else if len(c.Topics) > 1 {
-		url = fmt.Sprintf("%s/subscribe", c.HubAddr)
+	} else if len(c.Topics) > 0 {
 		body, _ = json.Marshal(c.Topics)
 	}
 	fmt.Println("Topics:" + string(body))
