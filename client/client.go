@@ -20,12 +20,13 @@ import (
 )
 
 type Client struct {
-	ClientID string
-	Topics   []string
-	HubAddr  string
-	conn     http.Client
-	req      http.Request
-	resp     http.Response
+	ClientID       string
+	Topics         []string
+	HubAddr        string
+	MessageHandler func(msg interface{}) error
+	conn           http.Client
+	req            http.Request
+	resp           http.Response
 }
 
 func NewHubClient(address string) (*Client, error) {
@@ -157,7 +158,9 @@ func (c *Client) GetMessages() {
 			}
 			glog.Fatal(err)
 		}
-		glog.Infof("Got Mesage: %+v", message)
+		if c.MessageHandler != nil {
+			c.MessageHandler(message)
+		}
 	}
 }
 
