@@ -147,11 +147,6 @@ func (c *Client) GetMessages() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusCreated {
-		glog.Fatal("unexpected status code: ", resp.StatusCode)
-	}
-	fmt.Println("Resp Code: ", resp.StatusCode)
-	fmt.Println("Resp Body: ", resp.Body)
 	dec := json.NewDecoder(resp.Body)
 	for {
 		var message interface{}
