@@ -161,12 +161,12 @@ func (h *Hub) getMessages(c echo.Context) error {
 
 	//topic := c.Param("topic")
 	//sub_id := c.Request().Header.Get(subscriberHeader)
-	sub := h.getSubscriberFromRequest(c)
-	if sub == nil {
-		return c.JSON(400, echo.Map{
-			"msg": "Subscriber not found",
-		})
-	}
+	// sub := h.getSubscriberFromRequest(c)
+	// if sub == nil {
+	// 	return c.JSON(400, echo.Map{
+	// 		"msg": "Subscriber not found",
+	// 	})
+	// }
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
@@ -190,7 +190,7 @@ func (h *Hub) getMessages(c echo.Context) error {
 	// 	}
 	// 	time.Sleep(1 * time.Second)
 	// }
-	stream := h.Registry.Subscribe(ctx, sub.Topics...)
+	stream := h.Registry.Subscribe(ctx, "test")
 	//var message interface{}
 	for {
 		m, err := stream.ReceiveMessage(ctx)
