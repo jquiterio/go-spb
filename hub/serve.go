@@ -133,7 +133,7 @@ func (h *Hub) subscribeToTopic(c echo.Context) error {
 		})
 	}
 	return c.JSON(200, echo.Map{
-		"msg": "OK",
+		"msg": "Subscribed to Topics: " + fmt.Sprint(topics),
 	})
 }
 

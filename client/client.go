@@ -59,6 +59,7 @@ func (c *Client) Subscribe() (ok bool) {
 		url = fmt.Sprintf("%s/subscribe", c.HubAddr)
 		body, _ = json.Marshal(c.Topics)
 	}
+	fmt.Println("Topics:" + string(body))
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		glog.Fatal(err)
@@ -216,6 +217,6 @@ func (c *Client) Me() {
 			}
 			glog.Fatal(err)
 		}
-		glog.Infof("Got Topic: %+v", message)
+		glog.Infof("Me: %+v", message)
 	}
 }
