@@ -9,6 +9,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,20 +25,21 @@ type Client struct {
 	Topics         []string
 	HubAddr        string
 	MessageHandler func(msg interface{}) error
-	conn           http.Client
-	req            http.Request
-	resp           http.Response
+	Conn           *http.Client
 }
 
 func NewHubClient(address string) (*Client, error) {
-	a, err := url.Parse("http://" + address)
+	a, err := url.Parse("https://" + address)
 	if err != nil {
 		glog.Fatal("Hub address must be a valid URL")
 		return nil, err
 	}
+
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	return &Client{
 		HubAddr:  a.String(),
 		ClientID: uuid.Must(uuid.NewV4()).String(),
+		Conn:     &http.Client{Transport: transport},
 	}, nil
 }
 
@@ -67,7 +69,7 @@ func (c *Client) Subscribe() (ok bool) {
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.Conn.Do(req)
 	if err != nil {
 		glog.Fatal(err)
 		return
@@ -96,7 +98,7 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.Conn.Do(req)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -123,7 +125,7 @@ func (c *Client) Publish(topic string, msg interface{}) {
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.Conn.Do(req)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -144,7 +146,7 @@ func (c *Client) GetMessages() {
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.Conn.Do(req)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -164,32 +166,30 @@ func (c *Client) GetMessages() {
 	}
 }
 
-func (c *Client) GetTopicMessage(topic string) {
-	url := fmt.Sprintf("%s/%s", c.HubAddr, topic)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	fmt.Println("Resp Code: ", resp.StatusCode)
-	fmt.Println("Resp Body: ", resp.Body)
-	dec := json.NewDecoder(resp.Body)
-	for {
-		var message interface{}
-		err := dec.Decode(&message)
-		if err != nil {
-			if err == io.EOF {
-				continue
-			}
-			glog.Fatal(err)
-		}
-		glog.Infof("Got Mesage: %+v", message)
-	}
-}
+// func (c *Client) GetTopicMessage(topic string) {
+// 	url := fmt.Sprintf("%s/%s", c.HubAddr, topic)
+// 	req, err := http.NewRequest("GET", url, nil)
+// 	if err != nil {
+// 		glog.Fatal(err)
+// 	}
+// 	req.Header.Set("X-Subscriber-ID", c.ClientID)
+// 	resp, err := http.DefaultClient.Do(req)
+// 	if err != nil {
+// 		glog.Fatal(err)
+// 	}
+// 	dec := json.NewDecoder(resp.Body)
+// 	for {
+// 		var message interface{}
+// 		err := dec.Decode(&message)
+// 		if err != nil {
+// 			if err == io.EOF {
+// 				continue
+// 			}
+// 			glog.Fatal(err)
+// 		}
+// 		glog.Infof("Got Mesage: %+v", message)
+// 	}
+// }
 
 func (c *Client) Me() {
 	url := fmt.Sprintf("%s/me", c.HubAddr)
@@ -198,12 +198,10 @@ func (c *Client) Me() {
 		glog.Fatal(err)
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.Conn.Do(req)
 	if err != nil {
 		glog.Fatal(err)
 	}
-	fmt.Println("Resp Code: ", resp.StatusCode)
-	fmt.Println("Resp Body: ", resp.Body)
 	dec := json.NewDecoder(resp.Body)
 	for {
 		var message interface{}
@@ -214,6 +212,5 @@ func (c *Client) Me() {
 			}
 			glog.Fatal(err)
 		}
-		glog.Infof("Me: %+v", message)
 	}
 }

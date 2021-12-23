@@ -8,12 +8,15 @@
 package hub
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/jquiterio/go-spb/config"
+	"github.com/jquiterio/go-spb/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -59,26 +62,62 @@ func (h *Hub) Serve() {
 	conf := config.Config
 
 	e := echo.New()
-	// e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-	// 	XSSProtection:         "",
-	// 	ContentTypeNosniff:    "",
-	// 	XFrameOptions:         "",
-	// 	HSTSMaxAge:            3600,
-	// 	ContentSecurityPolicy: "default-src 'self'",
-	// }))
+	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+		XSSProtection:         "",
+		ContentTypeNosniff:    "",
+		XFrameOptions:         "",
+		HSTSMaxAge:            3600,
+		ContentSecurityPolicy: "default-src 'self'",
+	}))
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
 
 	e.GET("/", h.getMessages)
 	e.GET("/me", h.getSubscriber)
 	//e.GET("/:topic", h.getMessages)
-	e.POST("subscribe", h.subscribeToTopic)
-	e.POST("/unsubscribe/:topic", h.unsubscribeTopic)
+	e.POST("subscribe", h.subscribeToTopics)
+	e.POST("/unsubscribe", h.unsubscribeTopics)
 	e.POST("/publish/:topic", h.publishToTopic)
 
 	hub_addr := conf.Hub.Addr + ":" + conf.Hub.Port
 	fmt.Println("Hub is listening on: " + hub_addr)
-	e.Logger.Fatal(e.Start(conf.Hub.Addr + ":" + conf.Hub.Port))
+	//e.Logger.Fatal(e.Start(conf.Hub.Addr + ":" + conf.Hub.Port))
+
+	certs, err := utils.GenCert()
+	if err != nil {
+		panic(err)
+	}
+	if err := certs.WriteCertsToFile(); err != nil {
+		panic(err)
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(certs.RootCA)
+	if err != nil {
+		panic(err)
+	}
+	s := http.Server{
+		Addr:    hub_addr,
+		Handler: e,
+		TLSConfig: &tls.Config{
+			Certificates: nil,
+			//RootCAs:      certPool,
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		},
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
+	}
+
+	if err := s.ListenAndServeTLS("server.pem", "server.key"); err != nil {
+		panic(err)
+	}
+
 }
 
 func (h *Hub) publishToTopic(c echo.Context) error {
@@ -112,7 +151,7 @@ func (h *Hub) publishToTopic(c echo.Context) error {
 	})
 }
 
-func (h *Hub) subscribeToTopic(c echo.Context) error {
+func (h *Hub) subscribeToTopics(c echo.Context) error {
 	topics := []string{}
 	if err := c.Bind(&topics); err != nil {
 		return c.JSON(400, echo.Map{
@@ -137,7 +176,7 @@ func (h *Hub) subscribeToTopic(c echo.Context) error {
 	})
 }
 
-func (h *Hub) unsubscribeTopic(c echo.Context) error {
+func (h *Hub) unsubscribeTopics(c echo.Context) error {
 
 	topic := c.Param("topic")
 	sub := h.getSubscriberFromRequest(c)
@@ -171,28 +210,7 @@ func (h *Hub) getMessages(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
-	// for {
-	// 	for _, s := range h.Subscribers {
-	// 		if s.ID == sub.ID {
-	// 			for _, t := range s.Topics {
-	// 				stream := h.Registry.Subscribe(ctx, t)
-	// 				m, err := stream.ReceiveMessage(ctx)
-	// 				if err != nil {
-	// 					return err
-	// 				}
-	// 				if t == m.Channel {
-	// 					if err := enc.Encode(m.Payload); err != nil {
-	// 						return err
-	// 					}
-	// 					c.Response().Flush()
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// 	time.Sleep(1 * time.Second)
-	// }
 	stream := h.Registry.Subscribe(ctx, sub.Topics...)
-	//var message interface{}
 	for {
 		m, err := stream.ReceiveMessage(ctx)
 		if err != nil {

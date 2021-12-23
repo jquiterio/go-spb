@@ -36,26 +36,51 @@ func GetIPAddr() string {
 	return ""
 }
 
-func WriteClientCertsToFile() error {
-	cert, err := GetClientCerts()
+func (cert AuthCert) WriteCertsToFile() error {
+	certFile, err := os.Create("server.pem")
 	if err != nil {
 		return err
 	}
-	certout, err := os.Create("client.pem")
+	defer certFile.Close()
+	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Cert})
 	if err != nil {
 		return err
 	}
-	defer certout.Close()
-	err = pem.Encode(certout, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Cert})
+	keyFile, err := os.Create("server.key")
 	if err != nil {
 		return err
 	}
-	keyout, err := os.OpenFile("client.key", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	defer keyFile.Close()
+	err = pem.Encode(keyFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: PrivateKeyToByte(cert.CertKey)})
 	if err != nil {
 		return err
 	}
-	defer keyout.Close()
-	err = pem.Encode(keyout, &pem.Block{Type: "EC PRIVATE KEY", Bytes: PrivateKeyToByte(cert.Key)})
+
+	clientcertout, err := os.Create("client.pem")
+	if err != nil {
+		return err
+	}
+	defer clientcertout.Close()
+	err = pem.Encode(clientcertout, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Cert})
+	if err != nil {
+		return err
+	}
+	clientkeyout, err := os.OpenFile("client.key", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer clientkeyout.Close()
+	err = pem.Encode(clientkeyout, &pem.Block{Type: "EC PRIVATE KEY", Bytes: PrivateKeyToByte(cert.ClientKey)})
+	if err != nil {
+		return err
+	}
+
+	rootCert, err := os.Create("root.pem")
+	if err != nil {
+		return err
+	}
+	defer rootCert.Close()
+	err = pem.Encode(rootCert, &pem.Block{Type: "CERTIFICATE", Bytes: cert.RootCA})
 	if err != nil {
 		return err
 	}
