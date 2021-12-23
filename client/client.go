@@ -192,3 +192,30 @@ func (c *Client) GetTopicMessage(topic string) {
 		glog.Infof("Got Mesage: %+v", message)
 	}
 }
+
+func (c *Client) Me() {
+	url := fmt.Sprintf("%s/me", c.HubAddr)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	req.Header.Set("X-Subscriber-ID", c.ClientID)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	fmt.Println("Resp Code: ", resp.StatusCode)
+	fmt.Println("Resp Body: ", resp.Body)
+	dec := json.NewDecoder(resp.Body)
+	for {
+		var message interface{}
+		err := dec.Decode(&message)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			glog.Fatal(err)
+		}
+		glog.Infof("Got Topic: %+v", message)
+	}
+}
