@@ -191,6 +191,7 @@ func (h *Hub) getMessages(c echo.Context) error {
 	// 	time.Sleep(1 * time.Second)
 	// }
 	stream := h.Registry.Subscribe(ctx, sub.Topics...)
+	//var message interface{}
 	for {
 		m, err := stream.ReceiveMessage(ctx)
 		if err != nil {
