@@ -18,8 +18,9 @@ var Config = struct {
 		Port string
 	}
 	Redis struct {
-		Addr string
-		DB   int
+		Addr   string
+		Passwd string
+		DB     int
 	}
 }{}
 
