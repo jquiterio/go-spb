@@ -10,9 +10,11 @@ package client
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -28,18 +30,40 @@ type Client struct {
 	Conn           *http.Client
 }
 
+func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
+	certPool := x509.NewCertPool()
+	pem, err := ioutil.ReadFile(ca)
+	if err != nil {
+		return nil, err
+	}
+	if ok := certPool.AppendCertsFromPEM(pem); !ok {
+		return nil, fmt.Errorf("cannot parse CA certificate")
+	}
+	cert, err := tls.LoadX509KeyPair(crt, key)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Config{
+		RootCAs:      certPool,
+		Certificates: []tls.Certificate{cert},
+	}, nil
+}
+
 func NewHubClient(address string) (*Client, error) {
 	a, err := url.Parse("https://" + address)
 	if err != nil {
 		glog.Fatal("Hub address must be a valid URL")
 		return nil, err
 	}
-
-	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	tlsconfig, err := tlsCconfig("ca.pem", "client.crt", "client.key")
+	if err != nil {
+		glog.Fatal("Error reading certs with files: ca.pem, client.crt, client.key")
+		return nil, err
+	}
 	return &Client{
 		HubAddr:  a.String(),
 		ClientID: uuid.Must(uuid.NewV4()).String(),
-		Conn:     &http.Client{Transport: transport},
+		Conn:     &http.Client{Transport: &http.Transport{TLSClientConfig: tlsconfig}},
 	}, nil
 }
 

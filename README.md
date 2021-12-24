@@ -1,0 +1,1 @@
+# Simple PubSub for Go

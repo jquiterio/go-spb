@@ -12,11 +12,11 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/jquiterio/go-spb/config"
-	"github.com/jquiterio/go-spb/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -58,6 +58,20 @@ func (h *Hub) getSubscriberFromRequest(c echo.Context) *Subscriber {
 	return h.GetSubscriber(sub)
 }
 
+func genCertError(err error) {
+	fmt.Errorf("Error reading ca.pem: %s", err)
+	fmt.Errorf("Please Proceed to generate the certificate")
+	fmt.Errorf("As follows:")
+	fmt.Errorf("openssl genrsa -out ca.key 2048")
+	fmt.Errorf("openssl req -new -x509 -key ca.key -out ca.pem -days 3650 -subj '/CN=ca'")
+	fmt.Errorf("openssl genrsa -out server.key 2048")
+	fmt.Errorf("openssl req -new -nodes -key server.key -out server.csr -subj '/CN=server'")
+	fmt.Errorf("openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out server.pem -days 3650")
+	fmt.Errorf("openssl genrsa -out client.key 2048")
+	fmt.Errorf("openssl req -new -nodes -key client.key -out client.csr -subj '/CN=client'")
+	fmt.Errorf("openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.pem -days 3650")
+}
+
 func (h *Hub) Serve() {
 	conf := config.Config
 
@@ -83,26 +97,22 @@ func (h *Hub) Serve() {
 	fmt.Println("Hub is listening on: " + hub_addr)
 	//e.Logger.Fatal(e.Start(conf.Hub.Addr + ":" + conf.Hub.Port))
 
-	certs, err := utils.GenCert()
+	caPem, err := ioutil.ReadFile("ca.pem")
 	if err != nil {
-		panic(err)
+		genCertError(err)
+		return
 	}
-	if err := certs.WriteCertsToFile(); err != nil {
-		panic(err)
+	rooca := x509.NewCertPool()
+	if ok := rooca.AppendCertsFromPEM(caPem); !ok {
+		panic("Failed to append CA cert")
 	}
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(certs.RootCA)
-	if err != nil {
-		panic(err)
-	}
+
 	s := http.Server{
 		Addr:    hub_addr,
 		Handler: e,
 		TLSConfig: &tls.Config{
-			Certificates: nil,
-			//RootCAs:      certPool,
+			Certificates:             nil,
 			MinVersion:               tls.VersionTLS12,
-			CurvePreferences:         []tls.CurveID{tls.CurveP256},
 			PreferServerCipherSuites: true,
 			CipherSuites: []uint16{
 				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -110,6 +120,8 @@ func (h *Hub) Serve() {
 				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 			},
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ClientCAs:  rooca,
 		},
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 	}
