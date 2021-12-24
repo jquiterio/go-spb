@@ -55,7 +55,7 @@ func NewHubClient(address string) (*Client, error) {
 		glog.Fatal("Hub address must be a valid URL")
 		return nil, err
 	}
-	tlsconfig, err := tlsCconfig("ca.pem", "client.crt", "client.key")
+	tlsconfig, err := tlsCconfig("ca.pem", "client.pem", "client.key")
 	if err != nil {
 		glog.Fatal("Error reading certs with files: ca.pem, client.crt, client.key")
 		return nil, err
