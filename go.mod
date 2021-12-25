@@ -1,4 +1,4 @@
-module github.com/jquiterio/go-spb
+module github.com/jquiterio/mhub
 
 go 1.16
 
