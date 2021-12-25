@@ -14,8 +14,9 @@ import (
 
 var Config = struct {
 	Hub struct {
-		Addr string
-		Port string
+		Addr   string
+		Port   string
+		Secure bool
 	}
 	Redis struct {
 		Addr   string
@@ -36,6 +37,11 @@ func init() {
 		Config.Hub.Port = "8083"
 	} else {
 		Config.Hub.Port = hub_port
+	}
+	if hub_secure, err := strconv.ParseBool(os.Getenv("HUB_SECURE")); err == nil {
+		Config.Hub.Secure = hub_secure
+	} else {
+		Config.Hub.Secure = false
 	}
 	redis_addr := os.Getenv("REDIS_ADDR")
 	if redis_addr == "" {

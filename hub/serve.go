@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jquiterio/go-spb/config"
+	"github.com/jquiterio/mhub/config"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -97,38 +97,51 @@ func (h *Hub) Serve() {
 	fmt.Println("Hub is listening on: " + hub_addr)
 	//e.Logger.Fatal(e.Start(conf.Hub.Addr + ":" + conf.Hub.Port))
 
-	caPem, err := ioutil.ReadFile("ca.pem")
-	if err != nil {
-		genCertError(err)
-		return
-	}
-	rooca := x509.NewCertPool()
-	if ok := rooca.AppendCertsFromPEM(caPem); !ok {
-		panic("Failed to append CA cert")
-	}
+	// HTTPS
+	if conf.Hub.Secure {
+		caPem, err := ioutil.ReadFile("ca.pem")
+		if err != nil {
+			genCertError(err)
+			return
+		}
+		rooca := x509.NewCertPool()
+		if ok := rooca.AppendCertsFromPEM(caPem); !ok {
+			panic("Failed to append CA cert")
+		}
 
-	s := http.Server{
-		Addr:    hub_addr,
-		Handler: e,
-		TLSConfig: &tls.Config{
-			Certificates:             nil,
-			MinVersion:               tls.VersionTLS12,
-			PreferServerCipherSuites: true,
-			CipherSuites: []uint16{
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+		s := http.Server{
+			Addr:    hub_addr,
+			Handler: e,
+			TLSConfig: &tls.Config{
+				Certificates:             nil,
+				MinVersion:               tls.VersionTLS12,
+				PreferServerCipherSuites: true,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+				},
+				ClientAuth: tls.RequireAndVerifyClientCert,
+				ClientCAs:  rooca,
 			},
-			ClientAuth: tls.RequireAndVerifyClientCert,
-			ClientCAs:  rooca,
-		},
-		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
+			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
+		}
+
+		if err := s.ListenAndServeTLS("server.pem", "server.key"); err != nil {
+			panic(err)
+		}
+	} else {
+		s := http.Server{
+			Addr:    hub_addr,
+			Handler: e,
+		}
+		if err := s.ListenAndServe(); err != nil {
+			panic(err)
+		}
 	}
 
-	if err := s.ListenAndServeTLS("server.pem", "server.key"); err != nil {
-		panic(err)
-	}
+	// HTTP
 
 }
 
@@ -142,7 +155,7 @@ func (h *Hub) publishToTopic(c echo.Context) error {
 	}
 	//sub := h.getSubscriberFromRequest(c)
 
-	var msg Message
+	var msg message
 	if err := c.Bind(&msg); err != nil {
 		return c.JSON(400, err)
 	}

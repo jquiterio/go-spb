@@ -28,6 +28,7 @@ type Client struct {
 	HubAddr        string
 	MessageHandler func(msg interface{}) error
 	Conn           *http.Client
+	Secure         bool
 }
 
 func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
@@ -49,21 +50,34 @@ func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
 	}, nil
 }
 
-func NewHubClient(address string) (*Client, error) {
-	a, err := url.Parse("https://" + address)
+func NewHubClient(address string, secure bool) (*Client, error) {
+	if len(address) == 0 {
+		return nil, fmt.Errorf("no hub address")
+	}
+	var conn *http.Client
+	var proto string
+	if secure {
+		proto = "https"
+		tlsconfig, err := tlsCconfig("ca.pem", "client.pem", "client.key")
+		if err != nil {
+			glog.Fatal("Error reading certs with files: ca.pem, client.crt, client.key")
+			return nil, err
+		}
+		conn = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsconfig}}
+	} else {
+		proto = "http"
+		conn = http.DefaultClient
+	}
+	a, err := url.Parse(proto + "://" + address)
 	if err != nil {
 		glog.Fatal("Hub address must be a valid URL")
 		return nil, err
 	}
-	tlsconfig, err := tlsCconfig("ca.pem", "client.pem", "client.key")
-	if err != nil {
-		glog.Fatal("Error reading certs with files: ca.pem, client.crt, client.key")
-		return nil, err
-	}
+
 	return &Client{
 		HubAddr:  a.String(),
 		ClientID: uuid.Must(uuid.NewV4()).String(),
-		Conn:     &http.Client{Transport: &http.Transport{TLSClientConfig: tlsconfig}},
+		Conn:     conn,
 	}, nil
 }
 

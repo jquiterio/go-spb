@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gofrs/uuid"
-	"github.com/jquiterio/go-spb/config"
+	"github.com/jquiterio/mhub/config"
 )
 
 var ctx = context.Background()
@@ -24,7 +24,7 @@ type Hub struct {
 	Registry    *redis.Client
 }
 
-type Message struct {
+type message struct {
 	SubscriberID string `json:"subscriber_id"`
 	MsgID        string `json:"msg_id"`
 	MsgType      string `json:"msg_type"`
@@ -38,7 +38,7 @@ type Subscriber struct {
 	Topics []string
 }
 
-func (m *Message) ToMap() map[string]interface{} {
+func (m *message) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"subscriber_id": m.SubscriberID,
 		"msg_id":        m.MsgID,
@@ -106,7 +106,7 @@ func (h *Hub) addTopicFromSubscribers() {
 	}
 }
 
-func (m *Message) FromMap(msg map[string]interface{}) error {
+func (m *message) FromMap(msg map[string]interface{}) error {
 	m.SubscriberID = msg["subscriber_id"].(string)
 	m.MsgID = msg["msg_id"].(string)
 	m.Msg = msg["msg"]
@@ -114,12 +114,12 @@ func (m *Message) FromMap(msg map[string]interface{}) error {
 	return nil
 }
 
-func (m *Message) ToJson() ([]byte, error) {
+func (m *message) ToJson() ([]byte, error) {
 	return json.Marshal(m.ToMap())
 }
 
-func NewMessage(sub Subscriber, topic string, msg interface{}) *Message {
-	return &Message{
+func Newmessage(sub Subscriber, topic string, msg interface{}) *message {
+	return &message{
 		SubscriberID: sub.ID,
 		MsgID:        uuid.Must(uuid.NewV4()).String(),
 		Topic:        topic,
@@ -156,6 +156,6 @@ func (s *Subscriber) RemoveTopic(topic string) {
 	}
 }
 
-func (h *Hub) Publish(msg Message) error {
+func (h *Hub) Publish(msg message) error {
 	return h.Registry.Publish(ctx, msg.Topic, msg.Msg).Err()
 }

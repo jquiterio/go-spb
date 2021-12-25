@@ -7,7 +7,7 @@
 
 package main
 
-import "github.com/jquiterio/go-spb/hub"
+import "github.com/jquiterio/mhub/hub"
 
 func main() {
 
