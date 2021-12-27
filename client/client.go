@@ -26,9 +26,14 @@ type Client struct {
 	ClientID       string
 	Topics         []string
 	HubAddr        string
-	MessageHandler func(msg interface{}) error
+	MessageHandler func(msg Message)
 	Conn           *http.Client
 	Secure         bool
+}
+
+type Message struct {
+	Topic string      `json:"topic"`
+	Data  interface{} `json:"data"`
 }
 
 func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
@@ -190,7 +195,7 @@ func (c *Client) GetMessages() {
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
-		var message interface{}
+		var message Message
 		err := dec.Decode(&message)
 		if err != nil {
 			if err == io.EOF {
@@ -203,31 +208,6 @@ func (c *Client) GetMessages() {
 		}
 	}
 }
-
-// func (c *Client) GetTopicMessage(topic string) {
-// 	url := fmt.Sprintf("%s/%s", c.HubAddr, topic)
-// 	req, err := http.NewRequest("GET", url, nil)
-// 	if err != nil {
-// 		glog.Fatal(err)
-// 	}
-// 	req.Header.Set("X-Subscriber-ID", c.ClientID)
-// 	resp, err := http.DefaultClient.Do(req)
-// 	if err != nil {
-// 		glog.Fatal(err)
-// 	}
-// 	dec := json.NewDecoder(resp.Body)
-// 	for {
-// 		var message interface{}
-// 		err := dec.Decode(&message)
-// 		if err != nil {
-// 			if err == io.EOF {
-// 				continue
-// 			}
-// 			glog.Fatal(err)
-// 		}
-// 		glog.Infof("Got Mesage: %+v", message)
-// 	}
-// }
 
 func (c *Client) Me() {
 	url := fmt.Sprintf("%s/me", c.HubAddr)

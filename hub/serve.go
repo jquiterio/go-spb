@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jquiterio/mhub/client"
 	"github.com/jquiterio/mhub/config"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -88,7 +89,7 @@ func (h *Hub) Serve() {
 
 	e.GET("/", h.getMessages)
 	e.GET("/me", h.getSubscriber)
-	//e.GET("/:topic", h.getMessages)
+	e.GET("/:topic", h.getMessageTopic)
 	e.POST("subscribe", h.subscribeToTopics)
 	e.POST("/unsubscribe", h.unsubscribeTopics)
 	e.POST("/publish/:topic", h.publishToTopic)
@@ -224,8 +225,6 @@ func (h *Hub) unsubscribeTopics(c echo.Context) error {
 
 func (h *Hub) getMessages(c echo.Context) error {
 
-	//topic := c.Param("topic")
-	//sub_id := c.Request().Header.Get(subscriberHeader)
 	sub := h.getSubscriberFromRequest(c)
 	if sub == nil {
 		return c.JSON(400, echo.Map{
@@ -236,6 +235,34 @@ func (h *Hub) getMessages(c echo.Context) error {
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
 	stream := h.Registry.Subscribe(ctx, sub.Topics...)
+	for {
+		m, err := stream.ReceiveMessage(ctx)
+		if err != nil {
+			return err
+		}
+		msg := client.Message{
+			Topic: m.Channel,
+			Data:  m.Payload,
+		}
+		if err := enc.Encode(msg); err != nil {
+			return err
+		}
+		c.Response().Flush()
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (h *Hub) getMessageTopic(c echo.Context) error {
+	topic := c.Param("topic")
+	if topic == "" {
+		return c.JSON(400, echo.Map{
+			"msg": "Topic is required",
+		})
+	}
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	c.Response().WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(c.Response())
+	stream := h.Registry.Subscribe(ctx, topic)
 	for {
 		m, err := stream.ReceiveMessage(ctx)
 		if err != nil {
