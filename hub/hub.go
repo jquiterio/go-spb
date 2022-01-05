@@ -48,7 +48,18 @@ func (m *message) ToMap() map[string]interface{} {
 }
 
 func NewHub() *Hub {
-	conf := config.Config
+	conf := config.GetDefaultConfig()
+	return &Hub{
+		Subscribers: make([]Subscriber, 0),
+		Topics:      make([]string, 0),
+		Registry: redis.NewClient(&redis.Options{
+			Addr: conf.Redis.Addr,
+			DB:   conf.Redis.DB,
+		}),
+	}
+}
+
+func NewHubWithConfig(conf config.Config) *Hub {
 	return &Hub{
 		Subscribers: make([]Subscriber, 0),
 		Topics:      make([]string, 0),

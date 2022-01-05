@@ -5,13 +5,13 @@
  * @license: MIT
  */
 
-package main
+package hub
 
-import "github.com/jquiterio/mhub/hub"
+// import "github.com/jquiterio/mhub/hub"
 
-func main() {
+// func main() {
 
-	h := hub.NewHub()
-	h.Serve()
+// 	h := hub.NewHub()
+// 	h.Serve()
 
-}
+// }

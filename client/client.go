@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/gofrs/uuid"
 	"github.com/golang/glog"
+	"github.com/jquiterio/uuid"
 )
 
 type Client struct {
@@ -81,7 +81,7 @@ func NewHubClient(address string, secure bool) (*Client, error) {
 
 	return &Client{
 		HubAddr:  a.String(),
-		ClientID: uuid.Must(uuid.NewV4()).String(),
+		ClientID: uuid.NewV4().String(),
 		Conn:     conn,
 	}, nil
 }
@@ -157,7 +157,7 @@ func (c *Client) Publish(topic string, msg interface{}) {
 		"topic":    topic,
 		"msg_type": "publish",
 		"msg":      msg,
-		"msg_id":   uuid.Must(uuid.NewV4()).String(),
+		"msg_id":   uuid.New().String(),
 	})
 	if err != nil {
 		glog.Fatal(err)

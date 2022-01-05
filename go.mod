@@ -6,6 +6,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golang/glog v1.0.0
+	github.com/jquiterio/uuid v0.0.0-20220101160411-00c952e73d83
 	github.com/labstack/echo/v4 v4.6.1
 	github.com/labstack/gommon v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
