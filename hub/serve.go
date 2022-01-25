@@ -74,7 +74,7 @@ func genCertError(err error) {
 }
 
 func (h *Hub) Serve() {
-	conf := config.Config
+	conf := config.GetFromEnvOrDefault()
 
 	e := echo.New()
 	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
