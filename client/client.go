@@ -29,6 +29,7 @@ type Client struct {
 	MessageHandler func(msg Message)
 	Conn           *http.Client
 	Secure         bool
+	Debug          bool
 }
 
 type Message struct {
@@ -205,6 +206,9 @@ func (c *Client) GetMessages() {
 		}
 		if c.MessageHandler != nil {
 			c.MessageHandler(message)
+		}
+		if c.Debug {
+			glog.Info(fmt.Sprintf("%s: %s", message.Topic, message.Data))
 		}
 	}
 }
