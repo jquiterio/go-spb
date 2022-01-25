@@ -67,8 +67,8 @@ func main() {
 #### Generate Certificates
 
 ```bash
-mkdir ~/go-spb_certificates
-cd ~/go-spb_certificates
+mkdir ~/mhub_certificates
+cd ~/mhub_certificates
 
 cp $GOPATH/src/github.com/jquiterio/mhub/gencert.sh .
 ./gencert.sh localhost
@@ -109,6 +109,8 @@ func main(){
 }
 ```
 
-##### Option 2: Docker
+##### Option 3: Docker
 
-Run `./build.sh` on the root of mhub `$GOPATH/src/github.com/jquiterio/mhub` to generate certs and docker image
+1 - Edit file `build.sh` by changing the variables `GOOS` and `GOARCH` according to your operating system and architecture. Ex.: `GOOS=linux GOARCH=amd64` for Linux/amd64.
+2 - Run `./build.sh` from on the root of mhub (`$GOPATH/src/github.com/jquiterio/mhub`) to generate certs and docker image.
+3 - Take the certificates and use on your mhub Client if your intend to use secure connection.
