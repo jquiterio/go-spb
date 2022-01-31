@@ -5,10 +5,10 @@
  * @license: MIT
  */
 
-package hub
+package mhub
 
 type Message struct {
-	subscriberID string      `json:"subscriber_id"`
+	SubscriberID string      `json:"subscriber_id"`
 	ID           string      `json:"id"`
 	Topic        string      `json:"topic"`
 	Type         string      `json:"type"`

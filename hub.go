@@ -5,14 +5,14 @@
  * @license: MIT
  */
 
-package hub
+package mhub
 
 import (
 	"context"
 	"encoding/json"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/jquiterio/mhub/config"
+	"github.com/jquiterio/uuid"
 )
 
 var ctx = context.Background()
@@ -47,7 +47,7 @@ func (m *Message) ToMap() map[string]interface{} {
 }
 
 func NewHub() *Hub {
-	conf := config.GetDefaultConfig()
+	conf := GetDefaultConfig()
 	return &Hub{
 		Subscribers: make([]Subscriber, 0),
 		Topics:      make([]string, 0),
@@ -58,7 +58,7 @@ func NewHub() *Hub {
 	}
 }
 
-func NewHubWithConfig(conf config.Config) *Hub {
+func NewHubWithConfig(conf Config) *Hub {
 	return &Hub{
 		Subscribers: make([]Subscriber, 0),
 		Topics:      make([]string, 0),
@@ -133,13 +133,13 @@ func Newmessage(sub Subscriber, topic string, msg interface{}) *Message {
 		SubscriberID: sub.ID,
 		ID:           uuid.New().String(),
 		Topic:        topic,
-		Msg:          msg,
+		Data:         msg,
 	}
 }
 
 func NewSubscriber(topics ...string) *Subscriber {
 	return &Subscriber{
-		ID:     uuid.Must(uuid.NewV4()).String(),
+		ID:     uuid.New().String(),
 		Topics: topics,
 	}
 }
@@ -166,6 +166,6 @@ func (s *Subscriber) RemoveTopic(topic string) {
 	}
 }
 
-func (h *Hub) Publish(msg message) error {
-	return h.Registry.Publish(ctx, msg.Topic, msg.Msg).Err()
+func (h *Hub) Publish(msg Message) error {
+	return h.Registry.Publish(ctx, msg.Topic, msg.Data).Err()
 }

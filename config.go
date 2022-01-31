@@ -5,7 +5,7 @@
  * @license: MIT
  */
 
-package config
+package mhub
 
 import (
 	"os"

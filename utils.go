@@ -5,7 +5,7 @@
  * @license: MIT
  */
 
-package hub
+package mhub
 
 func TopicInSubscriber(topic string, sub *Subscriber) bool {
 	for _, t := range sub.Topics {

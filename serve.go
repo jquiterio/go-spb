@@ -5,7 +5,7 @@
  * @license: MIT
  */
 
-package hub
+package mhub
 
 import (
 	"crypto/tls"
@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jquiterio/mhub/client"
 	"github.com/jquiterio/mhub/config"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -156,7 +155,7 @@ func (h *Hub) publishToTopic(c echo.Context) error {
 	}
 	//sub := h.getSubscriberFromRequest(c)
 
-	var msg message
+	var msg Message
 	if err := c.Bind(&msg); err != nil {
 		return c.JSON(400, err)
 	}
@@ -240,7 +239,7 @@ func (h *Hub) getMessages(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		msg := client.Message{
+		msg := Message{
 			Topic: m.Channel,
 			Data:  m.Payload,
 		}

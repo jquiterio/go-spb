@@ -5,7 +5,7 @@
  * @license: MIT
  */
 
-package client
+package hubClient
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 	"net/url"
 
 	"github.com/golang/glog"
-	"github.com/jquiterio/go-spb/hub"
+	"github.com/jquiterio/mhub"
 	"github.com/jquiterio/uuid"
 )
 
@@ -27,7 +27,7 @@ type Client struct {
 	ClientID       string
 	Topics         []string
 	HubAddr        string
-	MessageHandler func(msg hub.Message)
+	MessageHandler func(msg mhub.Message)
 	Conn           *http.Client
 	Secure         bool
 	Debug          bool
@@ -199,7 +199,7 @@ func (c *Client) GetMessages() {
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
-		var message hub.Message
+		var message mhub.Message
 		err := dec.Decode(&message)
 		if err != nil {
 			if err == io.EOF {
