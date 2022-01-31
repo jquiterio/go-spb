@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/gofrs/uuid"
 	"github.com/jquiterio/mhub/config"
 )
 
@@ -24,26 +23,26 @@ type Hub struct {
 	Registry    *redis.Client
 }
 
-type message struct {
-	SubscriberID string `json:"subscriber_id"`
-	MsgID        string `json:"msg_id"`
-	MsgType      string `json:"msg_type"`
-	Topic        string `json:"topic"`
-	Msg          interface {
-	} `json:"msg"`
-}
+// type message struct {
+// 	SubscriberID string `json:"subscriber_id"`
+// 	MsgID        string `json:"msg_id"`
+// 	MsgType      string `json:"msg_type"`
+// 	Topic        string `json:"topic"`
+// 	Msg          interface {
+// 	} `json:"msg"`
+// }
 
 type Subscriber struct {
 	ID     string
 	Topics []string
 }
 
-func (m *message) ToMap() map[string]interface{} {
+func (m *Message) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"subscriber_id": m.SubscriberID,
-		"msg_id":        m.MsgID,
+		"id":            m.ID,
 		"topic":         m.Topic,
-		"msg":           m.Msg,
+		"msg":           m.Data,
 	}
 }
 
@@ -117,22 +116,22 @@ func (h *Hub) addTopicFromSubscribers() {
 	}
 }
 
-func (m *message) FromMap(msg map[string]interface{}) error {
+func (m *Message) FromMap(msg map[string]interface{}) error {
 	m.SubscriberID = msg["subscriber_id"].(string)
-	m.MsgID = msg["msg_id"].(string)
-	m.Msg = msg["msg"]
+	m.ID = msg["id"].(string)
+	m.Data = msg["msg"]
 	m.Topic = msg["topic"].(string)
 	return nil
 }
 
-func (m *message) ToJson() ([]byte, error) {
+func (m *Message) ToJson() ([]byte, error) {
 	return json.Marshal(m.ToMap())
 }
 
-func Newmessage(sub Subscriber, topic string, msg interface{}) *message {
-	return &message{
+func Newmessage(sub Subscriber, topic string, msg interface{}) *Message {
+	return &Message{
 		SubscriberID: sub.ID,
-		MsgID:        uuid.Must(uuid.NewV4()).String(),
+		ID:           uuid.New().String(),
 		Topic:        topic,
 		Msg:          msg,
 	}

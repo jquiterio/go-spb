@@ -19,6 +19,7 @@ import (
 	"net/url"
 
 	"github.com/golang/glog"
+	"github.com/jquiterio/go-spb/hub"
 	"github.com/jquiterio/uuid"
 )
 
@@ -26,16 +27,18 @@ type Client struct {
 	ClientID       string
 	Topics         []string
 	HubAddr        string
-	MessageHandler func(msg Message)
+	MessageHandler func(msg hub.Message)
 	Conn           *http.Client
 	Secure         bool
 	Debug          bool
 }
 
-type Message struct {
-	Topic string      `json:"topic"`
-	Data  interface{} `json:"data"`
-}
+// type Message struct {
+// 	ID    string      `json:"id"`
+// 	Topic string      `json:"topic"`
+// 	Type  string      `json:"type"`
+// 	Data  interface{} `json:"msg"`
+// }
 
 func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
 	certPool := x509.NewCertPool()
@@ -155,10 +158,10 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 func (c *Client) Publish(topic string, msg interface{}) {
 	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 	body, err := json.Marshal(map[string]interface{}{
-		"topic":    topic,
-		"msg_type": "publish",
-		"msg":      msg,
-		"msg_id":   uuid.New().String(),
+		"topic": topic,
+		"type":  "publish",
+		"data":  msg,
+		"id":    uuid.New().String(),
 	})
 	if err != nil {
 		glog.Fatal(err)
@@ -196,7 +199,7 @@ func (c *Client) GetMessages() {
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
-		var message Message
+		var message hub.Message
 		err := dec.Decode(&message)
 		if err != nil {
 			if err == io.EOF {
