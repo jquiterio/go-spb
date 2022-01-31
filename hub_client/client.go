@@ -150,12 +150,14 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 
 func (c *Client) Publish(topic string, msg interface{}) {
 	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
-	body, err := json.Marshal(map[string]interface{}{
-		"topic": topic,
-		"type":  "publish",
-		"data":  msg,
-		"id":    uuid.New().String(),
-	})
+	message := mhub.NewMessage(c.ClientID, topic, "publish", msg)
+	// body, err := json.Marshal(map[string]interface{}{
+	// 	"topic": topic,
+	// 	"type":  "publish",
+	// 	"data":  msg,
+	// 	"id":    uuid.New().String(),
+	// })
+	body, err := message.ToJSON()
 	if err != nil {
 		glog.Fatal(err)
 	}

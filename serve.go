@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jquiterio/mhub"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -32,22 +31,22 @@ type (
 var subscriberHeader string = "X-Subscriber-ID"
 
 func HandlerSubscriberRequest() echo.MiddlewareFunc {
-	config := SubscriberRequestConfig{
+	sConfig := SubscriberRequestConfig{
 		Skipper:      middleware.DefaultSkipper,
 		TargetHeader: subscriberHeader,
 	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if config.Skipper(c) {
+			if sConfig.Skipper(c) {
 				return next(c)
 			}
 			req := c.Request()
 			res := c.Response()
-			sid := req.Header.Get(config.TargetHeader)
+			sid := req.Header.Get(sConfig.TargetHeader)
 			if sid == "" {
 				return c.JSON(http.StatusUnauthorized, "Please provide a valid subscriber id")
 			}
-			res.Header().Set(config.TargetHeader, sid)
+			res.Header().Set(sConfig.TargetHeader, sid)
 			return next(c)
 		}
 	}
@@ -73,7 +72,7 @@ func genCertError(err error) {
 }
 
 func (h *Hub) Serve() {
-	conf := config.GetFromEnvOrDefault()
+	conf := GetFromEnvOrDefault()
 
 	e := echo.New()
 	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
@@ -140,9 +139,6 @@ func (h *Hub) Serve() {
 			panic(err)
 		}
 	}
-
-	// HTTP
-
 }
 
 func (h *Hub) publishToTopic(c echo.Context) error {
@@ -163,6 +159,11 @@ func (h *Hub) publishToTopic(c echo.Context) error {
 	if msg.Topic == "" {
 		return c.JSON(400, echo.Map{
 			"msg": "Topic is required",
+		})
+	}
+	if msg.Data == nil {
+		return c.JSON(400, echo.Map{
+			"msg": "Data is required",
 		})
 	}
 

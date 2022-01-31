@@ -9,7 +9,6 @@ package mhub
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/jquiterio/uuid"
@@ -42,7 +41,7 @@ func (m *Message) ToMap() map[string]interface{} {
 		"subscriber_id": m.SubscriberID,
 		"id":            m.ID,
 		"topic":         m.Topic,
-		"msg":           m.Data,
+		"data":          m.Data,
 	}
 }
 
@@ -116,26 +115,14 @@ func (h *Hub) addTopicFromSubscribers() {
 	}
 }
 
-func (m *Message) FromMap(msg map[string]interface{}) error {
-	m.SubscriberID = msg["subscriber_id"].(string)
-	m.ID = msg["id"].(string)
-	m.Data = msg["msg"]
-	m.Topic = msg["topic"].(string)
-	return nil
-}
-
-func (m *Message) ToJson() ([]byte, error) {
-	return json.Marshal(m.ToMap())
-}
-
-func Newmessage(sub Subscriber, topic string, msg interface{}) *Message {
-	return &Message{
-		SubscriberID: sub.ID,
-		ID:           uuid.New().String(),
-		Topic:        topic,
-		Data:         msg,
-	}
-}
+// func Newmessage(sub Subscriber, topic string, msg interface{}) *Message {
+// 	return &Message{
+// 		SubscriberID: sub.ID,
+// 		ID:           uuid.New().String(),
+// 		Topic:        topic,
+// 		Data:         msg,
+// 	}
+// }
 
 func NewSubscriber(topics ...string) *Subscriber {
 	return &Subscriber{
