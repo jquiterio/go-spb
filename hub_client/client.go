@@ -33,13 +33,6 @@ type Client struct {
 	Debug          bool
 }
 
-// type Message struct {
-// 	ID    string      `json:"id"`
-// 	Topic string      `json:"topic"`
-// 	Type  string      `json:"type"`
-// 	Data  interface{} `json:"msg"`
-// }
-
 func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
 	certPool := x509.NewCertPool()
 	pem, err := ioutil.ReadFile(ca)

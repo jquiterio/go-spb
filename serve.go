@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jquiterio/mhub/config"
+	"github.com/jquiterio/mhub"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
