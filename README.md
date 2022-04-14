@@ -20,14 +20,22 @@ go build github.com/jquiterio/mhub -o mhub
 ./mhub
 ```
 
+this assume that you have a running REDIS SEVER on localhost:6379.
+
 it will listen on port 8083 at localhost address.
 
 #### Client
 
 ```go
+
+import mhubClient "github.com/jquiterio/mhubclient-go"
+
+
 func main() {
 		// Create a Client
-  	cli, err := client.NewHubClient("localhost:8083", false)
+		srvAddr := "localhost:8083" 
+		isSecure := false
+  	cli, err := mhubClient.NewHubClient(srvAddr, isSecure)
 	if err != nil {
 		panic(err)
 	}
@@ -41,11 +49,14 @@ func main() {
 	// curl -X POST -H "X-Subscriber-ID: $CLIENTID" \
 	// http://localhost:8083/publish/test \
 	// -d '{"msgType":"publish","topic":"test1","msg":"yay!"}'
-	fmt.Println(cli.ClientID)
+	//fmt.Println(cli.ClientID)
+
 	// Add a New Topic
 	// This will add a Topic to the Client (local information)
 	if ok := cli.AddTopic([]string{"test1", "test2"}); !ok {
-		panic("failed to add topic")
+		// do something if not OK
+		// not that you'll not receive any messages if not declare topics here
+		// like fmt.println("failed to add topics")
 	}
 	// Subscribe the client with topics you have added
 	// This will subscribe cli.ClientID to topics 'test1' and 'test2'.
@@ -65,6 +76,8 @@ func main() {
 ### Advanced Usage
 
 #### Generate Certificates
+
+if `cli, err := mhubClient.NewHubClient(srvAddr, true)` you have to create a tls certificate to use by the server and the client.
 
 ```bash
 mkdir ~/mhub_certificates
@@ -88,7 +101,7 @@ HUB_ADDR=localhost HUB_PORT=8083 REDIS_ADDR=localhost:6379 REDIS_PASSWD="" ./mhu
 ##### Option 2: Instantiate Hub Server in your project
 
 ```go
-import "github.com/jquiterio/mhub"
+import "github.com/jquiterio/mhub/server"
 func main(){
 	hub := mhub.NewHub()
 	// Possible actions/configurations:
