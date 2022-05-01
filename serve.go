@@ -84,11 +84,12 @@ func (h *Hub) Serve() {
 	}))
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		Skipper:      middleware.DefaultSkipper,
-  AllowOrigins: []string{"*"},
-  AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
-	})
+	// e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+	// 	Skipper:      middleware.DefaultSkipper,
+	// AllowOrigins: []string{"*"},
+	// AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
+	// })
+	e.Use(middleware.CORS())
 
 	e.GET("/", h.getMessages)
 	e.GET("/me", h.getSubscriber)
@@ -136,13 +137,14 @@ func (h *Hub) Serve() {
 			panic(err)
 		}
 	} else {
-		s := http.Server{
-			Addr:    hub_addr,
-			Handler: e,
-		}
-		if err := s.ListenAndServe(); err != nil {
-			panic(err)
-		}
+		// s := http.Server{
+		// 	Addr:    hub_addr,
+		// 	Handler: e,
+		// }
+		// if err := s.ListenAndServe(); err != nil {
+		// 	panic(err)
+		// }
+		e.Logger.Fatal(e.Start(hub_addr))
 	}
 }
 
