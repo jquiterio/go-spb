@@ -75,21 +75,21 @@ func (h *Hub) Serve() {
 	conf := GetFromEnvOrDefault()
 
 	e := echo.New()
-	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-		XSSProtection:         "",
-		ContentTypeNosniff:    "",
-		XFrameOptions:         "",
-		HSTSMaxAge:            3600,
-		ContentSecurityPolicy: "default-src 'self'",
-	}))
+	// e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+	// 	XSSProtection:         "",
+	// 	ContentTypeNosniff:    "",
+	// 	XFrameOptions:         "",
+	// 	HSTSMaxAge:            3600,
+	// 	ContentSecurityPolicy: "default-src 'self'",
+	// }))
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
-	// e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-	// 	Skipper:      middleware.DefaultSkipper,
-	// AllowOrigins: []string{"*"},
-	// AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
-	// })
-	e.Use(middleware.CORS())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		Skipper:      middleware.DefaultSkipper,
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
+	}))
+	//e.Use(middleware.CORS())
 
 	e.GET("/", h.getMessages)
 	e.GET("/me", h.getSubscriber)
