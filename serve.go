@@ -84,6 +84,11 @@ func (h *Hub) Serve() {
 	}))
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		Skipper:      middleware.DefaultSkipper,
+  AllowOrigins: []string{"*"},
+  AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
+	})
 
 	e.GET("/", h.getMessages)
 	e.GET("/me", h.getSubscriber)
