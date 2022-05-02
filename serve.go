@@ -151,6 +151,7 @@ func (h *Hub) Serve() {
 func (h *Hub) publishToTopic(c echo.Context) error {
 
 	topic := c.Param("topic")
+	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	if topic == "" {
 		return c.JSON(400, echo.Map{
 			"msg": "Topic is required",
@@ -204,6 +205,7 @@ func (h *Hub) subscribeToTopics(c echo.Context) error {
 			Topics: topics,
 		})
 	}
+	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	return c.JSON(200, echo.Map{
 		"msg": "Subscribed to Topics: " + fmt.Sprint(topics),
 	})
@@ -239,6 +241,7 @@ func (h *Hub) getMessages(c echo.Context) error {
 		})
 	}
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
 	stream := h.Registry.Subscribe(ctx, sub.Topics...)
@@ -267,6 +270,7 @@ func (h *Hub) getMessageTopic(c echo.Context) error {
 		})
 	}
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	c.Response().WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(c.Response())
 	stream := h.Registry.Subscribe(ctx, topic)
