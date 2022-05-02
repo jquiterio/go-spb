@@ -84,10 +84,13 @@ func (h *Hub) Serve() {
 	// }))
 	e.Use(middleware.Logger())
 	e.Use(HandlerSubscriberRequest())
+	e.Use(middleware.Recover())
+	e.Use(middleware.RequestID())
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		Skipper:      middleware.DefaultSkipper,
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, subscriberHeader},
 	}))
 	//e.Use(middleware.CORS())
 
@@ -187,6 +190,7 @@ func (h *Hub) publishToTopic(c echo.Context) error {
 
 func (h *Hub) subscribeToTopics(c echo.Context) error {
 	topics := []string{}
+	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	if err := c.Bind(&topics); err != nil {
 		return c.JSON(400, echo.Map{
 			"msg": err,
@@ -205,7 +209,6 @@ func (h *Hub) subscribeToTopics(c echo.Context) error {
 			Topics: topics,
 		})
 	}
-	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	return c.JSON(200, echo.Map{
 		"msg": "Subscribed to Topics: " + fmt.Sprint(topics),
 	})
