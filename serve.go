@@ -16,7 +16,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -50,17 +49,15 @@ func HandlerSubscriberRequest() fiber.Handler {
 		//sid := req_headers[sConfig.TargetHeader]
 		sid := c.Get(subscriberHeader)
 		if sid == "" {
-			return c.Status(http.StatusUnauthorized).JSON("Please provide a valid subscriber id")
+			return c.Status(401).JSON("Please provide a valid subscriber id")
 		}
-		res.Header.Set(sConfig.TargetHeader, sid)
+		res.Header.Set(subscriberHeader, sid)
 		return c.Next()
 	}
 }
 
-func (h *Hub) getSubscriberFromRequest(c *fiber.Ctx) *Subscriber {
-	//sub := c.Request().Header.Get(subscriberHeader)
-	sub := c.Get(subscriberHeader)
-	return h.GetSubscriber(sub)
+func (h *Hub) getSubscriberFromRequest(id string) *Subscriber {
+	return h.GetSubscriber(id)
 }
 
 func genCertError(err error) {
@@ -168,9 +165,9 @@ func (h *Hub) subscribeToTopics(c *fiber.Ctx) error {
 	if err := c.BodyParser(&topics); err != nil {
 		return c.Status(400).SendString("NOK")
 	}
-	sub := h.getSubscriberFromRequest(c)
+	id := c.Get(subscriberHeader)
+	sub := h.getSubscriberFromRequest(id)
 	if sub == nil {
-		id := c.Get(subscriberHeader)
 		h.Subscribe(Subscriber{
 			ID:     id,
 			Topics: topics,
@@ -189,7 +186,8 @@ func (h *Hub) subscribeToTopics(c *fiber.Ctx) error {
 func (h *Hub) unsubscribeTopics(c *fiber.Ctx) error {
 
 	topic := c.Params("topic")
-	sub := h.getSubscriberFromRequest(c)
+	id := c.Get(subscriberHeader)
+	sub := h.getSubscriberFromRequest(id)
 	if topic == "" {
 		topics := []string{}
 		if err := c.BodyParser(&topics); err != nil {
@@ -205,7 +203,8 @@ func (h *Hub) unsubscribeTopics(c *fiber.Ctx) error {
 
 func (h *Hub) getMessages(c *fiber.Ctx) error {
 
-	sub := h.getSubscriberFromRequest(c)
+	id := c.Get(subscriberHeader)
+	sub := h.getSubscriberFromRequest(id)
 	if sub == nil {
 		return c.Status(400).SendString("Subscriber not found")
 	}
@@ -297,7 +296,8 @@ func (h *Hub) getMessageTopic(c *fiber.Ctx) error {
 }
 
 func (h *Hub) getSubscriber(c *fiber.Ctx) error {
-	sub := h.getSubscriberFromRequest(c)
+	id := c.Get(subscriberHeader)
+	sub := h.getSubscriberFromRequest(id)
 	if sub == nil {
 		return c.Status(400).SendString("Subscriber not found")
 	}
