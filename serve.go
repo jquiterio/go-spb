@@ -1,23 +1,29 @@
 /*
  * @file: serve.go
  * @author: Jorge Quitério
- * @copyright (c) 2021 Jorge Quitério
+ * @copyright (c) 2022 Jorge Quitério
  * @license: MIT
  */
 
 package mhub
 
 import (
+	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net"
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/valyala/fasthttp"
 )
 
 type (
@@ -25,35 +31,35 @@ type (
 		Skipper      Skipper
 		TargetHeader string
 	}
-	Skipper func(echo.Context) bool
+	Skipper func(ctx *fiber.Ctx) bool
 )
 
 var subscriberHeader string = "X-Subscriber-ID"
 
-func HandlerSubscriberRequest() echo.MiddlewareFunc {
+func HandlerSubscriberRequest() fiber.Handler {
 	sConfig := SubscriberRequestConfig{
-		Skipper:      middleware.DefaultSkipper,
+		Skipper:      func(ctx *fiber.Ctx) bool { return false },
 		TargetHeader: subscriberHeader,
 	}
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			if sConfig.Skipper(c) {
-				return next(c)
-			}
-			req := c.Request()
-			res := c.Response()
-			sid := req.Header.Get(sConfig.TargetHeader)
-			if sid == "" {
-				return c.JSON(http.StatusUnauthorized, "Please provide a valid subscriber id")
-			}
-			res.Header().Set(sConfig.TargetHeader, sid)
-			return next(c)
+	return func(c *fiber.Ctx) error {
+		if sConfig.Skipper(c) {
+			return c.Next()
 		}
+		res := c.Response()
+		//req_headers := c.GetReqHeaders()
+		//sid := req_headers[sConfig.TargetHeader]
+		sid := c.Get(subscriberHeader)
+		if sid == "" {
+			return c.Status(http.StatusUnauthorized).JSON("Please provide a valid subscriber id")
+		}
+		res.Header.Set(sConfig.TargetHeader, sid)
+		return c.Next()
 	}
 }
 
-func (h *Hub) getSubscriberFromRequest(c echo.Context) *Subscriber {
-	sub := c.Request().Header.Get(subscriberHeader)
+func (h *Hub) getSubscriberFromRequest(c *fiber.Ctx) *Subscriber {
+	//sub := c.Request().Header.Get(subscriberHeader)
+	sub := c.Get(subscriberHeader)
 	return h.GetSubscriber(sub)
 }
 
@@ -71,134 +77,100 @@ func genCertError(err error) {
 	fmt.Errorf("openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.pem -days 3650")
 }
 
+func (h *Hub) newServer() *fiber.App {
+	app := fiber.New()
+
+	app.Use(logger.New())
+	app.Use(HandlerSubscriberRequest())
+	app.Use(recover.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
+		AllowHeaders: "Origin, Accept, Content-Type, " + subscriberHeader,
+	}))
+
+	app.Get("/", h.getMessages)
+	app.Post("/publish/:topic", h.publishToTopic)
+	app.Post("/subscribe", h.subscribeToTopics)
+	app.Post("/unsubscribe", h.unsubscribeTopics)
+	app.Get("/:topic", h.getMessageTopic)
+
+	return app
+}
+
 func (h *Hub) Serve() {
 	conf := GetFromEnvOrDefault()
 
-	e := echo.New()
-	// e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-	// 	XSSProtection:         "",
-	// 	ContentTypeNosniff:    "",
-	// 	XFrameOptions:         "",
-	// 	HSTSMaxAge:            3600,
-	// 	ContentSecurityPolicy: "default-src 'self'",
-	// }))
-	e.Use(middleware.Logger())
-	e.Use(HandlerSubscriberRequest())
-	e.Use(middleware.Recover())
-	e.Use(middleware.RequestID())
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		Skipper:      middleware.DefaultSkipper,
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, subscriberHeader},
-	}))
-	//e.Use(middleware.CORS())
-
-	e.GET("/", h.getMessages)
-	e.GET("/me", h.getSubscriber)
-	e.GET("/:topic", h.getMessageTopic)
-	e.POST("subscribe", h.subscribeToTopics)
-	e.POST("/unsubscribe", h.unsubscribeTopics)
-	e.POST("/publish/:topic", h.publishToTopic)
-
+	app := h.newServer()
 	hub_addr := conf.Hub.Addr + ":" + conf.Hub.Port
-	fmt.Println("Hub is listening on: " + hub_addr)
-	//e.Logger.Fatal(e.Start(conf.Hub.Addr + ":" + conf.Hub.Port))
 
-	// HTTPS
 	if conf.Hub.Secure {
 		caPem, err := ioutil.ReadFile("ca.pem")
 		if err != nil {
 			genCertError(err)
 			return
 		}
-		rooca := x509.NewCertPool()
-		if ok := rooca.AppendCertsFromPEM(caPem); !ok {
-			panic("Failed to append CA cert")
+		rootca := x509.NewCertPool()
+		if ok := rootca.AppendCertsFromPEM(caPem); !ok {
+			panic("Failed to parse root certificate")
 		}
-
-		s := http.Server{
-			Addr:    hub_addr,
-			Handler: e,
-			TLSConfig: &tls.Config{
-				Certificates:             nil,
-				MinVersion:               tls.VersionTLS12,
-				PreferServerCipherSuites: true,
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-				},
-				ClientAuth: tls.RequireAndVerifyClientCert,
-				ClientCAs:  rooca,
+		tlsconfig := &tls.Config{
+			Certificates:             nil,
+			MinVersion:               tls.VersionTLS12,
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 			},
-			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ClientCAs:  rootca,
 		}
-
-		if err := s.ListenAndServeTLS("server.pem", "server.key"); err != nil {
-			panic(err)
-		}
+		ln, _ := net.Listen("tcp", hub_addr)
+		ln = tls.NewListener(ln, tlsconfig)
+		log.Fatal(app.Listener(ln))
 	} else {
-		// s := http.Server{
-		// 	Addr:    hub_addr,
-		// 	Handler: e,
-		// }
-		// if err := s.ListenAndServe(); err != nil {
-		// 	panic(err)
-		// }
-		e.Logger.Fatal(e.Start(hub_addr))
+		log.Fatal(app.Listen(hub_addr))
 	}
 }
 
-func (h *Hub) publishToTopic(c echo.Context) error {
-
-	topic := c.Param("topic")
-	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
+func (h *Hub) publishToTopic(c *fiber.Ctx) error {
+	topic := c.Params("topic")
 	if topic == "" {
-		return c.JSON(400, echo.Map{
-			"msg": "Topic is required",
-		})
+		return c.Status(400).SendString("Please provide a topic")
 	}
-	//sub := h.getSubscriberFromRequest(c)
 
 	var msg Message
-	if err := c.Bind(&msg); err != nil {
-		return c.JSON(400, err)
+	if err := c.BodyParser(&msg); err != nil {
+		return c.Status(400).SendString("Please provide a message")
 	}
 
 	if msg.Topic == "" {
-		return c.JSON(400, echo.Map{
-			"msg": "Topic is required",
-		})
+		return c.Status(400).SendString("Please provide a topic")
 	}
+
 	if msg.Data == nil {
-		return c.JSON(400, echo.Map{
-			"msg": "Data is required",
-		})
+		return c.Status(400).SendString("Please provide a message")
 	}
 
 	if err := h.Publish(msg); err != nil {
-		return c.JSON(400, echo.Map{
-			"msg": err,
-		})
+		return c.Status(500).SendString(err.Error())
 	}
-	return c.JSON(201, echo.Map{
-		"msg": "OK",
-	})
+
+	return c.Status(201).SendString("ok")
+
 }
 
-func (h *Hub) subscribeToTopics(c echo.Context) error {
-	topics := []string{}
-	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
-	if err := c.Bind(&topics); err != nil {
-		return c.JSON(400, echo.Map{
-			"msg": err,
-		})
+func (h *Hub) subscribeToTopics(c *fiber.Ctx) error {
+	var topics []string
+	c.Set("Access-Control-Allow-Origin", "*")
+	if err := c.BodyParser(&topics); err != nil {
+		return c.Status(400).SendString("NOK")
 	}
 	sub := h.getSubscriberFromRequest(c)
 	if sub == nil {
-		id := c.Request().Header.Get(subscriberHeader)
+		id := c.Get(subscriberHeader)
 		h.Subscribe(Subscriber{
 			ID:     id,
 			Topics: topics,
@@ -209,93 +181,125 @@ func (h *Hub) subscribeToTopics(c echo.Context) error {
 			Topics: topics,
 		})
 	}
-	return c.JSON(200, echo.Map{
-		"msg": "Subscribed to Topics: " + fmt.Sprint(topics),
-	})
+
+	c.Set(subscriberHeader, sub.ID)
+	return c.Status(200).SendString("OK")
 }
 
-func (h *Hub) unsubscribeTopics(c echo.Context) error {
+func (h *Hub) unsubscribeTopics(c *fiber.Ctx) error {
 
-	topic := c.Param("topic")
+	topic := c.Params("topic")
 	sub := h.getSubscriberFromRequest(c)
 	if topic == "" {
 		topics := []string{}
-		if err := c.Bind(&topics); err != nil {
-			return c.JSON(400, echo.Map{
-				"msg": err,
-			})
+		if err := c.BodyParser(&topics); err != nil {
+			return c.Status(400).SendString("NOK")
 		}
 		h.Unsubscribe(sub, topics)
 	} else {
 		topics := []string{topic}
 		h.Unsubscribe(sub, topics)
 	}
-	return c.JSON(200, echo.Map{
-		"msg": "OK",
-	})
+	return c.Status(200).SendString("OK")
 }
 
-func (h *Hub) getMessages(c echo.Context) error {
+func (h *Hub) getMessages(c *fiber.Ctx) error {
 
 	sub := h.getSubscriberFromRequest(c)
 	if sub == nil {
-		return c.JSON(400, echo.Map{
-			"msg": "Subscriber not found",
-		})
+		return c.Status(400).SendString("Subscriber not found")
 	}
-	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
-	c.Response().WriteHeader(http.StatusOK)
-	enc := json.NewEncoder(c.Response())
+	c.Response().Header.SetContentType(fiber.MIMEApplicationJSON)
+	c.Set("Connection", "keep-alive")
+	c.Set("Access-Control-Allow-Origin", "*")
+	c.Status(200)
+	enc := json.NewEncoder(c.Response().BodyWriter())
 	stream := h.Registry.Subscribe(ctx, sub.Topics...)
-	for {
-		m, err := stream.ReceiveMessage(ctx)
-		if err != nil {
-			return err
+	// for {
+	// 	m, err := stream.ReceiveMessage(ctx)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	msg := Message{
+	// 		Topic: m.Channel,
+	// 		Data:  m.Payload,
+	// 	}
+	// 	if err := enc.Encode(msg); err != nil {
+	// 		return err
+	// 	}
+	// 	//c.Response().Flush()
+
+	// 	time.Sleep(500 * time.Millisecond)
+	// }
+	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
+		for {
+			m, err := stream.ReceiveMessage(ctx)
+			if err != nil {
+				return
+			}
+			msg := Message{
+				Topic: m.Channel,
+				Data:  m.Payload,
+			}
+			if err := enc.Encode(msg); err != nil {
+				return
+			}
+			w.Flush()
+			time.Sleep(500 * time.Millisecond)
 		}
-		msg := Message{
-			Topic: m.Channel,
-			Data:  m.Payload,
-		}
-		if err := enc.Encode(msg); err != nil {
-			return err
-		}
-		c.Response().Flush()
-		time.Sleep(1 * time.Second)
-	}
+	}))
+	return nil
 }
 
-func (h *Hub) getMessageTopic(c echo.Context) error {
-	topic := c.Param("topic")
+func (h *Hub) getMessageTopic(c *fiber.Ctx) error {
+	topic := c.Params("topic")
 	if topic == "" {
-		return c.JSON(400, echo.Map{
-			"msg": "Topic is required",
-		})
+		return c.Status(400).SendString("Topic is required")
 	}
-	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	c.Response().Header().Add("Access-Control-Allow-Origin", "*")
-	c.Response().WriteHeader(http.StatusOK)
-	enc := json.NewEncoder(c.Response())
+	//c.Response().Header().Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	//c.Response().Header().Add("Access-Control-Allow-Origin", "*")
+	c.Set("Connection", "keep-alive")
+	c.Set("Access-Control-Allow-Origin", "*")
+	//c.Response().WriteHeader(http.StatusOK)
+	c.Status(200)
+	enc := json.NewEncoder(c.Response().BodyWriter())
 	stream := h.Registry.Subscribe(ctx, topic)
-	for {
-		m, err := stream.ReceiveMessage(ctx)
-		if err != nil {
-			return err
+	// for {
+	// 	m, err := stream.ReceiveMessage(ctx)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if err := enc.Encode(m.Payload); err != nil {
+	// 		return err
+	// 	}
+	// 	c.Response().Flush()
+	// 	time.Sleep(1 * time.Second)
+	// }
+	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
+		for {
+			m, err := stream.ReceiveMessage(ctx)
+			if err != nil {
+				return
+			}
+			msg := Message{
+				Topic: m.Channel,
+				Data:  m.Payload,
+			}
+			if err := enc.Encode(msg); err != nil {
+				return
+			}
+			w.Flush()
+			time.Sleep(500 * time.Millisecond)
 		}
-		if err := enc.Encode(m.Payload); err != nil {
-			return err
-		}
-		c.Response().Flush()
-		time.Sleep(1 * time.Second)
-	}
+	}))
+	return nil
 }
 
-func (h *Hub) getSubscriber(c echo.Context) error {
+func (h *Hub) getSubscriber(c *fiber.Ctx) error {
 	sub := h.getSubscriberFromRequest(c)
 	if sub == nil {
-		return c.JSON(400, echo.Map{
-			"msg": "Subscriber not found",
-		})
+		return c.Status(400).SendString("Subscriber not found")
 	}
-	return c.JSON(200, sub)
+	return c.Status(200).JSON(sub)
 }
