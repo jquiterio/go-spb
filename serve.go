@@ -173,13 +173,14 @@ func (h *Hub) subscribeToTopics(c *fiber.Ctx) error {
 			Topics: topics,
 		})
 	} else {
-		h.Subscribe(Subscriber{
-			ID:     sub.ID,
-			Topics: topics,
-		})
+		for _, topic := range topics {
+			if !TopicInSubscriber(topic, sub) {
+				sub.Topics = append(sub.Topics, topic)
+			}
+		}
 	}
 
-	c.Set(subscriberHeader, sub.ID)
+	c.Set(subscriberHeader, id)
 	return c.Status(200).SendString("OK")
 }
 
