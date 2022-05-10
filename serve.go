@@ -91,6 +91,7 @@ func (h *Hub) newServer() *fiber.App {
 	app.Post("/subscribe", h.subscribeToTopics)
 	app.Post("/unsubscribe", h.unsubscribeTopics)
 	app.Get("/:topic", h.getMessageTopic)
+	app.Get("/me", h.getSubscriber)
 
 	return app
 }
