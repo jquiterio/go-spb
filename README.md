@@ -2,9 +2,25 @@
 
 ---
 
+### Convention
+
+
+***Topic***: string 
+
+***Message***: 
+
+string with the following format `action.object_name.object_id`
+
+`action`: can be any action ex.: `create`, `list`, `update`, `delete`, `sync`, etc.
+
+`object_name`: is the object name or group of objects, ex: `mug` or `cat`
+
+`object_id`: if action affects a particular object id, is the id of that object, otherwise if `null` or even nothing.
+
 ### Use Case
 
 ![usecase](usecase.png)
+
 
 ### Requirements
 

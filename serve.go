@@ -141,12 +141,10 @@ func (h *Hub) publishToTopic(c *fiber.Ctx) error {
 
 	var msg Message
 	if err := c.BodyParser(&msg); err != nil {
-		return c.Status(400).SendString("Please provide a message")
+		return c.Status(400).SendString("Please provide a correct message")
 	}
-
-	if msg.Topic == "" {
-		return c.Status(400).SendString("Please provide a topic")
-	}
+	msg.Topic = topic
+	msg.Type = "publish"
 
 	if msg.Data == nil {
 		return c.Status(400).SendString("Please provide a message")
