@@ -247,13 +247,13 @@ func (h *Hub) getMessageTopic(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Topic is required")
 	}
 	//c.Response().Header().Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-	c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	c.Set(fiber.HeaderContentType, fiber.MIMETextPlain)
 	//c.Response().Header().Add("Access-Control-Allow-Origin", "*")
 	c.Set("Connection", "keep-alive")
 	c.Set("Access-Control-Allow-Origin", "*")
 	//c.Response().WriteHeader(http.StatusOK)
 	c.Status(200)
-	enc := json.NewEncoder(c.Response().BodyWriter())
+	//enc := json.NewEncoder(c.Response().BodyWriter())
 	stream := h.Registry.Subscribe(ctx, topic)
 	// for {
 	// 	m, err := stream.ReceiveMessage(ctx)
@@ -272,13 +272,16 @@ func (h *Hub) getMessageTopic(c *fiber.Ctx) error {
 			if err != nil {
 				return
 			}
-			msg := Message{
-				Topic:   m.Channel,
-				Payload: m.Payload,
-			}
-			if err := enc.Encode(msg); err != nil {
-				return
-			}
+			// msg := Message{
+			// 	Topic: m.Channel,
+			// 	Payload:  m.Payload,
+			// }
+			w.WriteString(m.Channel + "." + string(m.Payload))
+			//b := []byte(m.Channel + "." + string(m.Payload))
+			//w.WriteByte(b[0])
+			// if err := enc.Encode(msg); err != nil {
+			// 	return
+			// }
 			w.Flush()
 			time.Sleep(500 * time.Millisecond)
 		}
