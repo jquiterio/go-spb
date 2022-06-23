@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -139,36 +140,29 @@ func (h *Hub) publishToTopic(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Please provide a topic")
 	}
 
-	var msg Message
-	if err := c.BodyParser(&msg); err != nil {
-		return c.Status(400).SendString("Please provide a correct message")
-	}
-	msg.Topic = topic
-	msg.Type = "publish"
-
-	if msg.Data == nil {
-		return c.Status(400).SendString("Please provide a message")
+	body := string(c.Body())
+	subscriberId := c.Get(subscriberHeader)
+	msg, err := ParseMessage(subscriberId, topic, body)
+	if err != nil {
+		return c.Status(400).SendString(err.Error())
 	}
 
-	if err := h.Publish(msg); err != nil {
+	if err := h.Publish(*msg); err != nil {
 		return c.Status(500).SendString(err.Error())
 	}
 
 	return c.Status(201).SendString("ok")
-
 }
 
 func (h *Hub) subscribeToTopics(c *fiber.Ctx) error {
-	var topics []string
 	c.Set("Access-Control-Allow-Origin", "*")
-	if err := c.BodyParser(&topics); err != nil {
-		return c.Status(400).SendString("NOK")
-	}
-	id := c.Get(subscriberHeader)
-	sub := h.getSubscriberFromRequest(id)
+	body := string(c.Body())
+	topics := strings.Split(body, ",")
+	subscriberId := c.Get(subscriberHeader)
+	sub := h.getSubscriberFromRequest(subscriberId)
 	if sub == nil {
 		h.Subscribe(Subscriber{
-			ID:     id,
+			ID:     subscriberId,
 			Topics: topics,
 		})
 	} else {
@@ -178,21 +172,18 @@ func (h *Hub) subscribeToTopics(c *fiber.Ctx) error {
 			}
 		}
 	}
-
-	c.Set(subscriberHeader, id)
+	c.Set(subscriberHeader, subscriberId)
 	return c.Status(200).SendString("OK")
 }
 
 func (h *Hub) unsubscribeTopics(c *fiber.Ctx) error {
-
 	topic := c.Params("topic")
 	id := c.Get(subscriberHeader)
 	sub := h.getSubscriberFromRequest(id)
 	if topic == "" {
 		topics := []string{}
-		if err := c.BodyParser(&topics); err != nil {
-			return c.Status(400).SendString("NOK")
-		}
+		body := string(c.Body())
+		topics = strings.Split(body, ",")
 		h.Unsubscribe(sub, topics)
 	} else {
 		topics := []string{topic}
@@ -237,8 +228,8 @@ func (h *Hub) getMessages(c *fiber.Ctx) error {
 				return
 			}
 			msg := Message{
-				Topic: m.Channel,
-				Data:  m.Payload,
+				Topic:   m.Channel,
+				Payload: m.Payload,
 			}
 			if err := enc.Encode(msg); err != nil {
 				return
@@ -282,8 +273,8 @@ func (h *Hub) getMessageTopic(c *fiber.Ctx) error {
 				return
 			}
 			msg := Message{
-				Topic: m.Channel,
-				Data:  m.Payload,
+				Topic:   m.Channel,
+				Payload: m.Payload,
 			}
 			if err := enc.Encode(msg); err != nil {
 				return

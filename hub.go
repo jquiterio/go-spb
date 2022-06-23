@@ -22,26 +22,17 @@ type Hub struct {
 	Registry    *redis.Client
 }
 
-// type message struct {
-// 	SubscriberID string `json:"subscriber_id"`
-// 	MsgID        string `json:"msg_id"`
-// 	MsgType      string `json:"msg_type"`
-// 	Topic        string `json:"topic"`
-// 	Msg          interface {
-// 	} `json:"msg"`
-// }
-
 type Subscriber struct {
 	ID     string
 	Topics []string
 }
 
-func (m *Message) ToMap() map[string]interface{} {
-	return map[string]interface{}{
+func (m *Message) ToMap() map[string]any {
+	return map[string]any{
 		"subscriber_id": m.SubscriberID,
 		"id":            m.ID,
 		"topic":         m.Topic,
-		"data":          m.Data,
+		"data":          m.Payload,
 	}
 }
 
@@ -115,15 +106,6 @@ func (h *Hub) addTopicFromSubscribers() {
 	}
 }
 
-// func Newmessage(sub Subscriber, topic string, msg interface{}) *Message {
-// 	return &Message{
-// 		SubscriberID: sub.ID,
-// 		ID:           uuid.New().String(),
-// 		Topic:        topic,
-// 		Data:         msg,
-// 	}
-// }
-
 func NewSubscriber(topics ...string) *Subscriber {
 	return &Subscriber{
 		ID:     uuid.New().String(),
@@ -154,5 +136,5 @@ func (s *Subscriber) RemoveTopic(topic string) {
 }
 
 func (h *Hub) Publish(msg Message) error {
-	return h.Registry.Publish(ctx, msg.Topic, msg.Data).Err()
+	return h.Registry.Publish(ctx, msg.Topic, msg.Payload).Err()
 }
