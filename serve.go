@@ -11,7 +11,6 @@ import (
 	"bufio"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -203,7 +202,7 @@ func (h *Hub) getMessages(c *fiber.Ctx) error {
 	c.Set("Connection", "keep-alive")
 	c.Set("Access-Control-Allow-Origin", "*")
 	c.Status(200)
-	enc := json.NewEncoder(c.Response().BodyWriter())
+	//enc := json.NewEncoder(c.Response().BodyWriter())
 	stream := h.Registry.Subscribe(ctx, sub.Topics...)
 	// for {
 	// 	m, err := stream.ReceiveMessage(ctx)
@@ -228,7 +227,7 @@ func (h *Hub) getMessages(c *fiber.Ctx) error {
 				return
 			}
 			if err == nil {
-				w.WriteString(m.Topic + "." + m.Payload)
+				w.WriteString(m.Channel + "." + m.Payload)
 			}
 			// msg := Message{
 			// 	Topic:   m.Channel,
