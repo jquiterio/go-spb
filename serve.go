@@ -227,13 +227,16 @@ func (h *Hub) getMessages(c *fiber.Ctx) error {
 			if err != nil {
 				return
 			}
-			msg := Message{
-				Topic:   m.Channel,
-				Payload: m.Payload,
+			if err == nil {
+				w.WriteString(m.Topic + "." + m.Payload)
 			}
-			if err := enc.Encode(msg); err != nil {
-				return
-			}
+			// msg := Message{
+			// 	Topic:   m.Channel,
+			// 	Payload: m.Payload,
+			// }
+			// if err := enc.Encode(msg); err != nil {
+			// 	return
+			// }
 			w.Flush()
 			time.Sleep(500 * time.Millisecond)
 		}
