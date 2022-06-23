@@ -198,7 +198,7 @@ func (h *Hub) getMessages(c *fiber.Ctx) error {
 	if sub == nil {
 		return c.Status(400).SendString("Subscriber not found")
 	}
-	c.Response().Header.SetContentType(fiber.MIMEApplicationJSON)
+	c.Response().Header.SetContentType(fiber.MIMETextPlain)
 	c.Set("Connection", "keep-alive")
 	c.Set("Access-Control-Allow-Origin", "*")
 	c.Status(200)
@@ -226,16 +226,7 @@ func (h *Hub) getMessages(c *fiber.Ctx) error {
 			if err != nil {
 				return
 			}
-			if err == nil {
-				w.WriteString(m.Channel + "." + m.Payload)
-			}
-			// msg := Message{
-			// 	Topic:   m.Channel,
-			// 	Payload: m.Payload,
-			// }
-			// if err := enc.Encode(msg); err != nil {
-			// 	return
-			// }
+			w.WriteString(m.Channel + "." + m.Payload)
 			w.Flush()
 			time.Sleep(500 * time.Millisecond)
 		}
